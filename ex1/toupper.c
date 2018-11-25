@@ -7,6 +7,7 @@
 #include <xmmintrin.h>
 #include <smmintrin.h>
 #include "options.h"
+#include <assert.h>
 
 
 int debug = 0;
@@ -49,6 +50,59 @@ static inline uintptr_t UpAlignAddr(uintptr_t v, uint32_t alignment)
 }
 
 static void toupper_optimised(char * text) {
+    if (!text)
+    {
+        return;
+    }
+    //assert(UpAlignAddr(13U, 16U) == 16U);
+    //assert(UpAlignAddr(33U, 16U) == 48U);
+
+    // Align pointer to be divisible by 16 to guarantee that we can use aligned vector loads.
+    uintptr_t textPtrAsUint = (uintptr_t)(text);
+    uintptr_t textPtrAsUintAligned = UpAlignAddr(textPtrAsUint, 16U);
+    char *textEnd = (char*)(textPtrAsUintAligned);
+    char c;
+    while (text != textEnd && (c = *text))
+    {
+        int cond = (c >= 'a' && c <= 'z');
+        c = c - cond * 0x20U;
+        *text = c;
+        ++text;
+    }
+
+    // Now go over the array using vector instructions
+    __m128i *head = (__m128i*)(textPtrAsUintAligned);
+    const __m128i lowerBound = _mm_set1_epi8('a'-1);
+    const __m128i upperBound = _mm_set1_epi8('z'+1);
+    const __m128i ending = _mm_set1_epi8('\0');
+    const __m128i sub = _mm_set1_epi8(0x20U);
+    while(1)
+    {
+        __m128i v = *head;
+        int canEnd = _mm_cmpistrs(v, v, _SIDD_UBYTE_OPS);
+        if (canEnd)
+        {
+            // Contains a \0 character.
+            break;
+        }
+        __m128i gt = _mm_cmpgt_epi8(v, lowerBound);
+        __m128i lt = _mm_cmplt_epi8(v, upperBound);
+        __m128i cond = _mm_and_si128(lt, gt);
+        __m128i toLower = _mm_sub_epi8(v, sub);
+        toLower = _mm_blendv_epi8(v, toLower, cond);
+        *head = toLower;
+        ++head;
+    }
+
+    // Handle suffix
+    text = (char*)head;
+    while ((c = *text))
+    {
+        int cond = (c >= 'a' && c <= 'z');
+        c = c - cond * 0x20U;
+        *text = c;
+        ++text;
+    }
 }
 
 
