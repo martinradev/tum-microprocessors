@@ -80,6 +80,15 @@ static void toupper_optimised(char * text, size_t n) {
     const size_t suffix = numRemainingsElements % ElementsPerLane;
     size_t nVector = (numRemainingsElements - suffix) / ElementsPerLane;
 
+    // IDEAS:
+    // - We first have to profile using perf to verify what is the CPI of our program and compare it against the theoretical maximal.
+    // - Measure reached memory bandwidth and compare it against the theoretical maximal.
+    // - Possibly we're not reaching the maximum possible ILP. To do so we should manually unroll the loop below.
+    // - We're likely not saturating the memory system as we're using a single thread.
+    //   It would be beneficial to divide the work among some number of threads.
+    // - We do not have ANY temporal locality in our program. It would be beneficial to use non-temporal memory accesses.
+    //   We should make sure we have an sfence before we return.
+
     // Populate a vector of the character preceding 'a'. Necessary because there is no GE but only GT.
     const __m128i lowerBound = _mm_set1_epi8('a'-1);
     // Only LT, no LE.
