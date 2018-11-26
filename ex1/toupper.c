@@ -99,16 +99,26 @@ static void toupper_optimised(char * text, size_t n) {
     const size_t suffix = numRemainingsElements % ElementsPerLane;
     __m128i *head = (__m128i*)(textPtrAsUintAligned);
     __m128i *tail = (__m128i*)(textPtrAsUintAligned + numRemainingsElements - suffix);
+
+#define USE_NON_TEMPORAL_ACCESSES 1
     while(tail != head)
     {
         --tail;
+#if USE_NON_TEMPORAL_ACCESSES == 1
+        __m128i v = _mm_stream_load_si128(tail);
+#else
         __m128i v = *tail;
+#endif
         __m128i gt = _mm_cmpgt_epi8(v, lowerBound);
         __m128i lt = _mm_cmplt_epi8(v, upperBound);
         __m128i cond = _mm_and_si128(lt, gt);
         __m128i toLower = _mm_sub_epi8(v, sub);
         toLower = _mm_blendv_epi8(v, toLower, cond);
+#if USE_NON_TEMPORAL_ACCESSES == 1
+        _mm_stream_si128(tail, toLower);
+#else
         *tail = toLower;
+#endif
     }
 
     // Handle suffix
@@ -120,6 +130,12 @@ static void toupper_optimised(char * text, size_t n) {
         *text = c;
         ++text;
     }
+
+
+#if USE_NON_TEMPORAL_ACCESSES == 1
+    // Set a store fence for all of the non-temporal writes.
+    _mm_sfence();
+#endif
 }
 
 
