@@ -114,7 +114,7 @@ static void toupper_optimised(char * text, size_t n) {
     }
 
     // Handle suffix
-    text = (char*)(text + numRemainingsElements);
+    text = (char*)(text + numRemainingsElements - suffix);
     while ((c = *text))
     {
         int cond = (c >= 'a' && c <= 'z');
@@ -185,7 +185,7 @@ void run_toupper(int size, int ratio, int version, toupperfunc f, const char* na
     if(debug) printf("Before: %.40s...\n",text);
 
     start = gettime();
-    (*f)(text, size);
+    (*f)(text, sizes[size]);
     stop = gettime();
     results[index] = stop-start;
 
