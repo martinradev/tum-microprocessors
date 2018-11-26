@@ -8,6 +8,7 @@
 #include <smmintrin.h>
 #include "options.h"
 #include <assert.h>
+#include <time.h>
 
 
 int debug = 0;
@@ -20,11 +21,9 @@ int no_sz = 1, no_ratio =1, no_version=1;
 // This is not really the way to be done.
 // Rather, one should use the arch-specific high performance counters!
 static inline double gettime(void) {
-    // to be implemented
-    struct timeval tv = {0};
-    int res = gettimeofday(&tv, NULL);
-    (void)res;
-    return ((double)tv.tv_sec + (double)tv.tv_usec / 1000000.0);
+    struct timespec ts = {0};
+    int err = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+    return ts.tv_nsec / 1000000000.0;
 }
 
 
