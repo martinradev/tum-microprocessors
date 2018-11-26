@@ -75,11 +75,6 @@ static void toupper_optimised(char * text, size_t n) {
 
     // Now go over the array using vector instructions
 
-    // Figure out how many vector-wide steps we can do. After all, we should process the last few elements in scalar fashion.
-    const size_t numRemainingsElements = n - (textPtrAsUintAligned - textPtrAsUint);
-    const size_t suffix = numRemainingsElements % ElementsPerLane;
-    size_t nVector = (numRemainingsElements - suffix) / ElementsPerLane;
-
     // IDEAS:
     // - We first have to profile using perf to verify what is the CPI of our program and compare it against the theoretical maximal.
     // - Measure reached memory bandwidth and compare it against the theoretical maximal.
@@ -99,10 +94,13 @@ static void toupper_optimised(char * text, size_t n) {
     // Normally you save 1 instruction in the loop by going backwards.
     // Reason: when iterating forward we need an increment, cmp and then je
     //         when iterating backwards we need a decrement (which updates the status flag EFLAGS), and then only a jz(je) :)
-    __m128i *tail = (__m128i*)(textPtrAsUintAligned) + nVector;
-    while(nVector != 0U)
+    // Figure out how many vector-wide steps we can do. After all, we should process the last few elements in scalar fashion.
+    const size_t numRemainingsElements = n - (textPtrAsUintAligned - textPtrAsUint);
+    const size_t suffix = numRemainingsElements % ElementsPerLane;
+    __m128i *head = (__m128i*)(textPtrAsUintAligned);
+    __m128i *tail = (__m128i*)(textPtrAsUintAligned + numRemainingsElements - suffix);
+    while(tail != head)
     {
-        --nVector;
         --tail;
         __m128i v = *tail;
         __m128i gt = _mm_cmpgt_epi8(v, lowerBound);
