@@ -23,6 +23,7 @@ int no_sz = 1, no_ratio =1, no_version=1;
 static inline double gettime(void) {
     struct timespec ts = {0};
     int err = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+    (void)err;
     return ts.tv_nsec / 1000000000.0;
 }
 
