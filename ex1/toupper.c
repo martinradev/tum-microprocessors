@@ -17,10 +17,9 @@ unsigned long   *sizes;
 
 int no_sz = 1, no_ratio =1, no_version=1;
 
-
-
-static inline
-double gettime(void) {
+// This is not really the way to be done.
+// Rather, one should use the arch-specific high performance counters!
+static inline double gettime(void) {
     // to be implemented
     struct timeval tv = {0};
     int res = gettimeofday(&tv, NULL);
@@ -29,7 +28,7 @@ double gettime(void) {
 }
 
 
-static void toupper_simple(char * text) {
+static void toupper_simple(char * text, size_t n) {
     if (!text)
     {
         return;
@@ -44,12 +43,13 @@ static void toupper_simple(char * text) {
     }
 }
 
+// Alignment should be a power of 2.
 static inline uintptr_t UpAlignAddr(uintptr_t v, uint32_t alignment)
 {
     return (v + alignment - 1U) & ~((uintptr_t)alignment - 1U);
 }
 
-static void toupper_optimised(char * text) {
+static void toupper_optimised(char * text, size_t n) {
     if (!text)
     {
         return;
@@ -58,8 +58,11 @@ static void toupper_optimised(char * text) {
     //assert(UpAlignAddr(33U, 16U) == 48U);
 
     // Align pointer to be divisible by 16 to guarantee that we can use aligned vector loads.
+    // Note: The allocation is padded in order to guarantee that text is 16-byte aligned.
+    //       However, let's guarantee that ourselves as we shouldn't assume that. Regardless, this should be pratically free.
+    const uint32_t ElementsPerLane = 16U;
     uintptr_t textPtrAsUint = (uintptr_t)(text);
-    uintptr_t textPtrAsUintAligned = UpAlignAddr(textPtrAsUint, 16U);
+    uintptr_t textPtrAsUintAligned = UpAlignAddr(textPtrAsUint, ElementsPerLane);
     char *textEnd = (char*)(textPtrAsUintAligned);
     char c;
     while (text != textEnd && (c = *text))
@@ -71,31 +74,38 @@ static void toupper_optimised(char * text) {
     }
 
     // Now go over the array using vector instructions
-    __m128i *head = (__m128i*)(textPtrAsUintAligned);
+
+    // Figure out how many vector-wide steps we can do. After all, we should process the last few elements in scalar fashion.
+    const size_t numRemainingsElements = n - (textPtrAsUintAligned - textPtrAsUint);
+    const size_t suffix = numRemainingsElements % ElementsPerLane;
+    size_t nVector = (numRemainingsElements - suffix) / ElementsPerLane;
+
+    // Populate a vector of the character preceding 'a'. Necessary because there is no GE but only GT.
     const __m128i lowerBound = _mm_set1_epi8('a'-1);
+    // Only LT, no LE.
     const __m128i upperBound = _mm_set1_epi8('z'+1);
-    const __m128i ending = _mm_set1_epi8('\0');
+    // Create a vector of the value we're going to subtract.
     const __m128i sub = _mm_set1_epi8(0x20U);
-    while(1)
+    // Start from end and go towards the end. I'm not sure whether in this case it matters.
+    // Normally you save 1 instruction in the loop by going backwards.
+    // Reason: when iterating forward we need an increment, cmp and then je
+    //         when iterating backwards we need a decrement (which updates the status flag EFLAGS), and then only a jz(je) :)
+    __m128i *tail = (__m128i*)(textPtrAsUintAligned) + nVector;
+    while(nVector != 0U)
     {
-        __m128i v = *head;
-        int canEnd = _mm_cmpistrs(v, v, _SIDD_UBYTE_OPS);
-        if (canEnd)
-        {
-            // Contains a \0 character.
-            break;
-        }
+        --nVector;
+        --tail;
+        __m128i v = *tail;
         __m128i gt = _mm_cmpgt_epi8(v, lowerBound);
         __m128i lt = _mm_cmplt_epi8(v, upperBound);
         __m128i cond = _mm_and_si128(lt, gt);
         __m128i toLower = _mm_sub_epi8(v, sub);
         toLower = _mm_blendv_epi8(v, toLower, cond);
-        *head = toLower;
-        ++head;
+        *tail = toLower;
     }
 
     // Handle suffix
-    text = (char*)head;
+    text = (char*)(text + numRemainingsElements);
     while ((c = *text))
     {
         int cond = (c >= 'a' && c <= 'z');
@@ -149,7 +159,7 @@ char * init(unsigned long int sz, int ratio){
  * ******************* Run the different versions **************
  */
 
-typedef void (*toupperfunc)(char *text);
+typedef void (*toupperfunc)(char *text, size_t n);
 
 void run_toupper(int size, int ratio, int version, toupperfunc f, const char* name)
 {
@@ -166,7 +176,7 @@ void run_toupper(int size, int ratio, int version, toupperfunc f, const char* na
     if(debug) printf("Before: %.40s...\n",text);
 
     start = gettime();
-    (*f)(text);
+    (*f)(text, size);
     stop = gettime();
     results[index] = stop-start;
 
