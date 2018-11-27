@@ -125,10 +125,10 @@ static void toupper_optimised(char * text, size_t n) {
             startTh[i] = head + i * elementsPerThread;
             endTh[i] = head + (i+1U) * elementsPerThread;
         }
-        endTh[i] = tail;
+        endTh[NumThreads-1U] = tail;
     }
 
-#define USE_NON_TEMPORAL_ACCESSES 1 
+#define USE_NON_TEMPORAL_ACCESSES 1
 #pragma omp parallel num_threads(numThreads) firstprivate(startTh, endTh) private(head, tail)
 {
     unsigned tid = omp_get_thread_num();
@@ -136,7 +136,6 @@ static void toupper_optimised(char * text, size_t n) {
     __m128i *tail = endTh[tid];
     while(tail != head)
     {
-        ++head;
 #if USE_NON_TEMPORAL_ACCESSES == 1
         __m128i v = _mm_stream_load_si128(head);
 #else
@@ -152,11 +151,12 @@ static void toupper_optimised(char * text, size_t n) {
 #else
         *head = toLower;
 #endif
+        ++head;
     }
 }
 
     // Handle suffix
-    text = (char*)(text + numRemainingsElements - suffix);
+    text = (char*)(text + (textPtrAsUintAligned - textPtrAsUint) + elementsForVectorOps);
     while ((c = *text))
     {
         int cond = (c >= 'a' && c <= 'z');
@@ -330,5 +330,23 @@ int main(int argc, char* argv[])
 				run(i,j);
 
 		printresults();
+
+    if (debug)
+    {
+        char *u = init(sizes[0], 0);
+        char *v = (char*)malloc(sizes[0]);
+        memcpy(v, u, sizes[0]);
+        toupper_simple(u, sizes[0]);
+        toupper_optimised(v, sizes[0]);
+        printf("Verify\n");
+        unsigned long int j;
+        for (j = 0; j < sizes[0]; ++j)
+        {
+            if (u[j] != v[j])
+            {
+                printf("Error at %lu. Expected %c, Result %c\n", j, u[j], v[j]);
+            }
+        }
+    }
     return 0;
 }
