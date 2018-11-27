@@ -9,7 +9,7 @@
 #include "options.h"
 #include <assert.h>
 #include <time.h>
-
+#include <omp.h>
 
 int debug = 0;
 double *results;
@@ -17,14 +17,15 @@ double *ratios;
 unsigned long   *sizes;
 
 int no_sz = 1, no_ratio =1, no_version=1;
+unsigned NumThreads=1;
 
 // This is not really the way to be done.
 // Rather, one should use the arch-specific high performance counters!
 static inline double gettime(void) {
     struct timespec ts = {0};
-    int err = clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+    int err = clock_gettime(CLOCK_MONOTONIC, &ts);
     (void)err;
-    return ts.tv_nsec / 1000000000.0;
+    return (double)ts.tv_sec + (double)ts.tv_nsec / 1000000000.0;
 }
 
 
@@ -98,16 +99,48 @@ static void toupper_optimised(char * text, size_t n) {
     const size_t numRemainingsElements = n - (textPtrAsUintAligned - textPtrAsUint);
     const size_t suffix = numRemainingsElements % ElementsPerLane;
     __m128i *head = (__m128i*)(textPtrAsUintAligned);
-    __m128i *tail = (__m128i*)(textPtrAsUintAligned + numRemainingsElements - suffix);
+    size_t elementsForVectorOps = numRemainingsElements - suffix;
+    __m128i *tail = (__m128i*)(textPtrAsUintAligned + elementsForVectorOps);
+    size_t numThreads = NumThreads;
+    __m128i* startTh[64];
+    __m128i* endTh[64];
+    if (elementsForVectorOps < 100000U)
+    {
+        // Not really worth it to do it on multiple threads.
+        numThreads = 1U;
+        startTh[0] = head;
+        endTh[0] = tail;
+    }
+    else
+    {
+        // Let's make sure that each boundary is 64 byte aligned as that's the cache line size.
+        const size_t numVectorsPerCacheLine = 64U / ElementsPerLane;
+        const size_t numVectors = (elementsForVectorOps / ElementsPerLane);
+        const size_t numCacheLines = numVectors / numVectorsPerCacheLine;
+        const size_t cacheLinesPerThread = numCacheLines / numThreads;
+        const size_t elementsPerThread = cacheLinesPerThread * numVectorsPerCacheLine;
+        size_t i;
+        for (i = 0; i < numThreads; ++i)
+        {
+            startTh[i] = head + i * elementsPerThread;
+            endTh[i] = head + (i+1U) * elementsPerThread;
+        }
+        endTh[i] = tail;
+    }
 
-#define USE_NON_TEMPORAL_ACCESSES 1
+#define USE_NON_TEMPORAL_ACCESSES 1 
+#pragma omp parallel num_threads(numThreads) firstprivate(startTh, endTh) private(head, tail)
+{
+    unsigned tid = omp_get_thread_num();
+    __m128i *head = startTh[tid];
+    __m128i *tail = endTh[tid];
     while(tail != head)
     {
-        --tail;
+        ++head;
 #if USE_NON_TEMPORAL_ACCESSES == 1
-        __m128i v = _mm_stream_load_si128(tail);
+        __m128i v = _mm_stream_load_si128(head);
 #else
-        __m128i v = *tail;
+        __m128i v = *head;
 #endif
         __m128i gt = _mm_cmpgt_epi8(v, lowerBound);
         __m128i lt = _mm_cmplt_epi8(v, upperBound);
@@ -115,11 +148,12 @@ static void toupper_optimised(char * text, size_t n) {
         __m128i toLower = _mm_sub_epi8(v, sub);
         toLower = _mm_blendv_epi8(v, toLower, cond);
 #if USE_NON_TEMPORAL_ACCESSES == 1
-        _mm_stream_si128(tail, toLower);
+        _mm_stream_si128(head, toLower);
 #else
-        *tail = toLower;
+        *head = toLower;
 #endif
     }
+}
 
     // Handle suffix
     text = (char*)(text + numRemainingsElements - suffix);
@@ -231,12 +265,12 @@ void printresults(){
 
 	for(j=0;j<no_sz;j++){
 		for(k=0;k<no_ratio;k++){
-			printf("Size: %ld \tRatio: %f \tRunning time:", sizes[j], ratios[k]);
+			printf("Size: %ld \tRatio: %lf \tRunning time:", sizes[j], ratios[k]);
 			for(i=0;i<no_version;i++){
 				index =  k;
 				index += j*no_ratio;
 				index += i*no_sz*no_ratio;
-				printf("\t%s: %f", toupperversion[i].name, results[index]);
+				printf("\t%s: %lf", toupperversion[i].name, results[index]);
 			}
 			printf("\n");
 		}
@@ -270,6 +304,9 @@ int main(int argc, char* argv[])
 					max_ratio = atoi(argv[arg+2]);
 					step_ratio = atoi(argv[arg+3]);
 			}
+            if (0==strcmp("-t",argv[arg])){
+                NumThreads = atoi(argv[arg+1]);
+            }
 
 		}
     for(v=0; toupperversion[v].func !=0; v++)

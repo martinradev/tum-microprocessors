@@ -11,8 +11,8 @@ VARIANTS += $(PROGRAM)_variant3
 VARIANTS += $(PROGRAM)_variant4 
 
 
-ICC = icc -fsource-asm -fno-alias -lm $(sources)
-GCC = gcc -lm -march=native $(sources)
+ICC = icc -fsource-asm -fno-alias -fopenmp -lm $(sources)
+GCC = gcc -lm -march=native -fopenmp $(sources)
 $(PROGRAM)_variant1 = $(GCC) -O0 
 $(PROGRAM)_variant2 = $(GCC) -O1
 $(PROGRAM)_variant3 = $(GCC) -O2
