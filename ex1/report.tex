@@ -1,0 +1,72 @@
+\documentclass[10pt, fleqn]{article}
+
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[fleqn]{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage[colorinlistoftodos]{todonotes}
+\usepackage{listings}
+\usepackage{subfig}
+\usepackage{float}
+\usepackage{mwe}
+\usepackage{hyperref}
+\usepackage[a4paper, total={6in, 10in}]{geometry}
+\DeclareMathOperator{\EX}{\mathbb{E}}% expected value
+\title{Microprocessors, Optimizing ToUpperCase}
+\author{Martin, Paul, Muhamad}
+
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Assumptions about the problem}
+
+\section{Measuring performance}
+
+\section{The naive version}
+
+\section{Optimizing}
+
+\subsection{Using SIMD}
+Not a good idea, should have started with multithreading first.
+
+Main implementation:
+
+Handling misaligned pointer.
+
+Handling non-power of 16 buffer sizes.
+
+\subsection{More ILP?}
+No, already covered through speculation, so unrolling doesn't help!
+
+\subsection{Multithreading through OpenMP}
+
+\subsection{Non-temporal accesses}
+
+\subsection{Final results}
+
+I7-3930k
+
+I5-4700MQ
+
+Both reach 80% peak theoretical bandwidth.
+
+\iffalse
+\begin{abstract}
+		This is where the abstract goes
+\end{abstract}
+\fi
+
+\iffalse
+\begin{thebibliography}{9}
+\bibitem{nano3}
+  K. Grove-Rasmussen og Jesper Nygård,
+  \emph{Kvantefænomener i Nanosystemer}.
+  Niels Bohr Institute \& Nano-Science Center, Københavns Universitet
+
+\end{thebibliography}
+\fi
+\end{document}
+
