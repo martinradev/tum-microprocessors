@@ -5,10 +5,10 @@ exeprog()
 {
 	progname=$1
 	startsz=10000
-	endsz=80000
+	endsz=80000000
 	stepsz=10000
-	i=0
-	while [ "$i" -lt "$MAX_THREADS" ]; do
+	i=1
+	while [ "$i" -le "$MAX_THREADS" ]; do
 		f="${progname}_${startsz}_${endsz}_${i}.txt"
 		cmd="./$progname -l $startsz $endsz $stepsz -t $i > $f"
 		echo "Running $cmd"
