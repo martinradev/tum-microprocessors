@@ -22,28 +22,85 @@
 \maketitle
 
 \section{Assumptions about the problem}
+The problem consists of reading memory, performing very few operations on the read memory and possibly writing it back.\\
+Such a problem on almost every system should be memory bound.\\
+Thus, at some point doing any optimizations on arithmetic efficiency would not yield a performance improvement as we would be bound by memory.\\
 
 \section{Measuring performance}
+The function \textit{getimeofday} seems to be deprecated and only offers microsend accuracy.\\
+The alternative, \textit{clock\_gettime} offers nanosecond accuracy, so we should rather use that one.
 
 \section{The naive version}
+The naive version loops over each byte, computes the condition for which it should subtract 0x20 and updates the value.\\
+This seemed slightly faster over using a branch and writing the value from within the block.
 
 \section{Optimizing}
 
 \subsection{Using SIMD}
-Not a good idea, should have started with multithreading first.
+We shouldn't really expect big performance improvements when using SIMD in memory bound problems.\\
+The reason for this is that whenever all threads are issuing memory accesses, the memory subsystem is already saturated.\\
+However, if one uses a single thread, SIMD would help as the memory system cannot be fully saturated and we benefit from issuing as many reads and writes as possible.\\
 
-Main implementation:
+Main implementation:\\
+\begin{lstlisting}
+__m128i *head = start of array;
+__m128i *tail = end of array;
+const __m128i lowerBound = _mm_set1_epi8('a'-1);
+const __m128i upperBound = _mm_set1_epi8('z'+1);
+const __m128i sub = _mm_set1_epi8(0x20U);
+while(tail != head)
+{
+    __m128i v = *head;
+    __m128i gt = _mm_cmpgt_epi8(v, lowerBound);
+    __m128i lt = _mm_cmplt_epi8(v, upperBound);
+    __m128i cond = _mm_and_si128(lt, gt);
+    __m128i toLower = _mm_sub_epi8(v, sub);
+    toLower = _mm_blendv_epi8(v, toLower, cond);
+    *head = toLower;
+    ++head;
+}
+\end{lstlisting}
 
-Handling misaligned pointer.
-
-Handling non-power of 16 buffer sizes.
+We should also handle the case of the input being a virtual address which is not 16-byte aligned.\\
+To do so we up-align the address and handle the prefix of bytes in scalar fashion.\\\\
+We should also handle the trailing bytes so that we do not write past the input array.\\
+The solution is calculate the number of vector blocks which cover the array but do not go past the end. The trailing bytes (which are smaller than 16 in number) are handled in scalar fasion.
+Using SIMD helped tremendously when computation is carried out on a single thread.
 
 \subsection{More ILP?}
-No, already covered through speculation, so unrolling doesn't help!
+The algorithm does not exhibit significant amount of ILP.\\
+We can do the two comparisons and the subtraction in parallel but all further instructions are dependent.\\
+However, the flow of this block of code is very simple. The branch (loop iterating again) is almost always true and the next operands come sequentially from memory.\\
+Through speculative execution future operations will be performed and commited leading to more operations being performed each cycle. According to perf, we get over 2.10 IPC where as 3 is the maximum for my Sandy Bridge I7 3930K.
+Unrolling doesn't help here as speculative execution does its magic.
 
 \subsection{Multithreading through OpenMP}
+As mentioned before, using a single thread fails to saturate the memory subsystem.\\
+To do so, we need to have multiple threads reading and writing memory.\\
+It really doesn't matter how this is achieved. We used OpenMP for its simplistic programming model.
 
 \subsection{Non-temporal accesses}
+Intel64 uses the MESI protocol for guaranteing cache coherence among all of the cores.\\
+Every time a cache line is not present in the LLC, a BusRD snoop will be generated to other caches to verify whether the data is present in another cache and the state of it.\\
+The information could reduce traffic to main memory and also guarantee cache coherence.\\
+Because the data on which each thread operates is disjoint, these snoop requests are unnecessary and a snoop filter will elimate most of them.\\
+Regardless, the presence of cache does not help to improve performance for our problem as we do not exhibit any temporal locality (only spatial locality).\\
+To avoid unnecessary traffic over the processor interconnect, we could make use of non-temporal memory accesses.\\
+This would improve the performance of the overall program as the cache would not be touched by our computation.\\\\
+The change is simple:\\
+\begin{lstlisting}
+while(tail != head)
+{
+      __m128i v = _mm_stream_load_si128(head);
+      // Do computation
+      _mm_stream_si128(head, toLower);
+}
+_mm_sfence();
+\end{lstlisting}
+
+The \textit{\_mm\_sfence()} is necessary to guarantee that other reads and writes to the same memory are not reordered before the writes in the loop above.\\
+In practice this is not necessary as long as the handled block is big enough.\\
+Using non-temporal accesses improves performance a bit.
 
 \subsection{Final results}
 
