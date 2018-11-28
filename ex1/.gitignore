@@ -3,3 +3,5 @@ results*
 *.txt
 toupper_variant*
 .autoclean
+*.swp
+
