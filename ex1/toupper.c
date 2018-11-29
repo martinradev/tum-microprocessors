@@ -177,9 +177,10 @@ static void toupper_optimised(char * text, size_t n) {
 
 
 // align at 16byte boundaries
-void* mymalloc(unsigned long int size)
+void* mymalloc(unsigned long int size, void **original)
 {
      void* addr = malloc(size+32);
+     *original = addr;
      return (void*)((unsigned long int)addr /16*16+16);
 }
 
@@ -198,9 +199,9 @@ char createChar(int ratio){
 
 }
 
-char * init(unsigned long int sz, int ratio){
+char * init(unsigned long int sz, int ratio, char **original){
     int i=0;
-    char *text = (char *) mymalloc(sz+1);
+    char *text = (char *) mymalloc(sz+1, original);
     srand(1);// ensures that all strings are identical
     for(i=0;i<sz;i++){
 			char c = createChar(ratio);
@@ -227,7 +228,8 @@ void run_toupper(int size, int ratio, int version, toupperfunc f, const char* na
 		index += size*no_ratio;
 		index += version*no_sz*no_ratio;
 
-    char *text = init(sizes[size], ratios[ratio]);
+    char *textOriginalPtr;
+    char *text = init(sizes[size], ratios[ratio], &textOriginalPtr);
 
 
     if(debug) printf("Before: %.40s...\n",text);
@@ -237,6 +239,7 @@ void run_toupper(int size, int ratio, int version, toupperfunc f, const char* na
     stop = gettime();
     results[index] = stop-start;
 
+    free(textOriginalPtr);
     if(debug) printf("After:  %.40s...\n",text);
 }
 
@@ -333,7 +336,8 @@ int main(int argc, char* argv[])
 
     if (debug)
     {
-        char *u = init(sizes[0], 0);
+        char *originalU;
+        char *u = init(sizes[0], 0, &originalU);
         char *v = (char*)malloc(sizes[0]);
         memcpy(v, u, sizes[0]);
         toupper_simple(u, sizes[0]);
