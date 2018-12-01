@@ -5,6 +5,24 @@ theoreticalX = [0, 39010000]
 theoreticalY = [0, 0.00152382812]
 linestyles = ['-', '--', '-.', ':']
 
+def GenRes(fname):
+    file = open(fname, 'r')
+    next(file)
+    tmpOptimized = []
+    tmpSimple = []
+    for line in file:
+        toks = ["Size: ", "simple: ", "optimised: "]
+        ends = [" ", "\t", "\t"]
+        res = []
+        for (u,v) in zip(toks, ends):
+            a = line.find(u) + len(u)
+            b = line.find(v, a)
+            res.append(line[a: b])
+        tmpOptimized.append((int(res[0]), float(res[2])))
+        tmpSimple.append((int(res[0]), float(res[1])))
+    return (tmpSimple, tmpOptimized)
+
+
 def Plot(compiler):
     iccResultsOptimized = [[], [], [], [], []]
     iccResultsSimple = [[], [], [], [], []]
@@ -12,20 +30,7 @@ def Plot(compiler):
     for opt in range(1,5):
         for t in range(1, 13):
             fname = "toupper_variant/toupper_variant" + str(opt) + "_" + compiler + "_10000_40000000_" + str(t) + ".txt"
-            file = open(fname, 'r')
-            next(file)
-            tmpOptimized = []
-            tmpSimple = []
-            for line in file:
-                toks = ["Size: ", "simple: ", "optimised: "]
-                ends = [" ", "\t", "\t"]
-                res = []
-                for (u,v) in zip(toks, ends):
-                    a = line.find(u) + len(u)
-                    b = line.find(v, a)
-                    res.append(line[a: b])
-                tmpOptimized.append((int(res[0]), float(res[2])))
-                tmpSimple.append((int(res[0]), float(res[1])))
+            (tmpSimple, tmpOptimized) = GenRes(fname)
             iccResultsOptimized[opt].append(tmpOptimized)
             if t==1:
                 iccResultsSimple[opt].append(tmpSimple)
@@ -168,3 +173,27 @@ ax.set_xlabel("Input size (bytes)")
 ax.set_ylabel("Time (sec)")
 pp.show()
 
+# Gen plot for non-temporal vs tempora
+fig = pp.figure()
+ax = fig.add_subplot(1,1,1)
+
+(simpleTemp, optTemp) = GenRes("toupper_variant/toupper_temporal.txt")
+(simpleNonTemp, optNonTemp) = GenRes("toupper_variant/toupper_non_temporal.txt")
+
+style = linestyles[0]
+plotId1, = pp.plot([u[0] for u in optNonTemp], [u[1] for u in optNonTemp], style)
+
+style = linestyles[1]
+plotId2, = pp.plot([u[0] for u in optTemp], [u[1] for u in optTemp], style)
+
+theoreticalX[1] *= 2
+theoreticalY[1] *= 2
+theoreticalId, = pp.plot(theoreticalX, theoreticalY, linestyles[2])
+idsLegend = [plotId1, plotId2, theoreticalId]
+
+legendStr = ["Non-temporal", "Temporal", "Theoretical"]
+pp.legend(idsLegend, legendStr)
+ax.set_title("Comparison of temporal and non-temporal accesses")
+ax.set_xlabel("Input size (bytes)")
+ax.set_ylabel("Time (sec)")
+pp.show()

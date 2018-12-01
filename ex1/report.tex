@@ -14,7 +14,7 @@
 \usepackage[a4paper, total={6in, 10in}]{geometry}
 \DeclareMathOperator{\EX}{\mathbb{E}}% expected value
 \title{Microprocessors, Optimizing ToUpperCase}
-\author{Martin, Paul, Muhamad}
+\author{Martin, Paul, Inshal}
 
 \date{\today}
 
@@ -27,12 +27,23 @@ Such a problem on almost every system should be memory bound.\\
 Thus, at some point doing any optimizations on arithmetic efficiency would not yield a performance improvement as we would be bound by memory.\\
 
 \section{Measuring performance}
-The function \textit{getimeofday} seems to be deprecated and only offers microsend accuracy.\\
+The function \textit{gettimeofday} seems to be deprecated and only offers microsend accuracy.\\
 The alternative, \textit{clock\_gettime} offers nanosecond accuracy, so we should rather use that one.
 
 \section{The naive version}
 The naive version loops over each byte, computes the condition for which it should subtract 0x20 and updates the value.\\
 This seemed slightly faster over using a branch and writing the value from within the block.
+
+\begin{lstlisting}
+char c;
+while((c = *text))
+{
+    int cond = (c >= 'a' && c <= 'z');
+    c = c - cond*0x20U;
+    *text = c;
+    ++text;
+}
+\end{lstlisting}
 
 \section{Optimizing}
 
@@ -40,7 +51,7 @@ This seemed slightly faster over using a branch and writing the value from withi
 We shouldn't really expect big performance improvements when using SIMD in memory bound problems.\\
 The reason for this is that whenever all threads are issuing memory accesses, the memory subsystem is already saturated.\\
 However, if one uses a single thread, SIMD would help as the memory system cannot be fully saturated and we benefit from issuing as many reads and writes as possible.\\
-
+\pagebreak
 Main implementation:\\
 \begin{lstlisting}
 __m128i *head = start of array;
@@ -60,7 +71,6 @@ while(tail != head)
     ++head;
 }
 \end{lstlisting}
-
 We should also handle the case of the input being a virtual address which is not 16-byte aligned.\\
 To do so we up-align the address and handle the prefix of bytes in scalar fashion.\\\\
 We should also handle the trailing bytes so that we do not write past the input array.\\
@@ -70,8 +80,8 @@ Using SIMD helped tremendously when computation is carried out on a single threa
 \subsection{More ILP?}
 The algorithm does not exhibit significant amount of ILP.\\
 We can do the two comparisons and the subtraction in parallel but all further instructions are dependent.\\
-However, the flow of this block of code is very simple. The branch (loop iterating again) is almost always true and the next operands come sequentially from memory.\\
-Through speculative execution future operations will be performed and commited leading to more operations being performed each cycle. According to perf, we get over 2.10 IPC where as 3 is the maximum for my Sandy Bridge I7 3930K.
+The flow of this block of code is very simple. The branch (loop iterating again) is almost always true and the next operands come sequentially from memory.\\
+Through speculative execution future operations will be performed and commited leading to more operations being performed each cycle. According to perf, we get over 2.10 IPC where as 3 is the maximum for my Sandy Bridge I7 3930K.\\
 Unrolling doesn't help here as speculative execution does its magic.
 
 \subsection{Multithreading through OpenMP}
@@ -83,7 +93,7 @@ It really doesn't matter how this is achieved. We used OpenMP for its simplistic
 Intel64 uses the MESI protocol for guaranteing cache coherence among all of the cores.\\
 Every time a cache line is not present in the LLC, a BusRD snoop will be generated to other caches to verify whether the data is present in another cache and the state of it.\\
 The information could reduce traffic to main memory and also guarantee cache coherence.\\
-Because the data on which each thread operates is disjoint, these snoop requests are unnecessary and a snoop filter will elimate most of them.\\
+Because the data on which each thread operates is disjoint, these snoop requests are unnecessary and a snoop filter will elimate most of them but possibly not all.\\
 Regardless, the presence of cache does not help to improve performance for our problem as we do not exhibit any temporal locality (only spatial locality).\\
 To avoid unnecessary traffic over the processor interconnect, we could make use of non-temporal memory accesses.\\
 This would improve the performance of the overall program as the cache would not be touched by our computation.\\\\
@@ -97,18 +107,36 @@ while(tail != head)
 }
 _mm_sfence();
 \end{lstlisting}
-
 The \textit{\_mm\_sfence()} is necessary to guarantee that other reads and writes to the same memory are not reordered before the writes in the loop above.\\
 In practice this is not necessary as long as the handled block is big enough.\\
 Using non-temporal accesses improves performance a bit.
 
 \subsection{Final results}
 
-I7-3930k
+The CPU used for benchmarking and profiling is I7-3930k with 16 GB DDR3-1600.\\
+Some info on the CPU:\\
+\begin{itemize}
+\item 6 cores clocked at 3.20 GHz supporting in total 12 threads
+\item Peak bandwidth 51.2 GB/s
+\end{itemize}
 
-I5-4700MQ
+\includegraphics[scale=.8]{plots/Figure_1.png}\\
+\includegraphics[scale=.8]{plots/Figure_1-1.png}\\
+\includegraphics[scale=.8]{plots/Figure_1-2.png}\\
+\includegraphics[scale=.8]{plots/Figure_1-3.png}\\
+\includegraphics[scale=.8]{plots/Figure_1-4.png}\\
+\includegraphics[scale=.8]{plots/Figure_1-5.png}\\
+\includegraphics[scale=.8]{plots/Figure_1-6.png}\\
+\includegraphics[scale=.8]{plots/Figure_1-7.png}\\
+\includegraphics[scale=.8]{plots/Figure_1-8.png}\\
+\includegraphics[scale=.8]{plots/Figure_1-9.png}\\
 
-Both reach 80% peak theoretical bandwidth.
+\subsection{Conclusion}
+ICC performs slightly better for the naive implementation but we do not see much of a performance difference for our optimized version.\\
+We do not observe performance improvement from going over 6 threads. The reason for this is that SMT only helps when due to conflicts we cannot make use of the
+available units on the CPU. In our case, we are limited by memory throughput making it impossible to feed any more threads.\\
+Using \textit{-O2} helps considerably over \textit{-O0}.\\
+Using non-temporal memory accesses helps improve performance a bit.
 
 \iffalse
 \begin{abstract}
