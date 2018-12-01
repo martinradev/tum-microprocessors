@@ -9,7 +9,7 @@ exeprog()
 	stepsz=1000000
 	i=1
 	while [ "$i" -le "$MAX_THREADS" ]; do
-		f="${progname}_${startsz}_${endsz}_${i}.txt"
+		f="${progname}_gcc_${startsz}_${endsz}_${i}.txt"
 		cmd="./$progname -l $startsz $endsz $stepsz -t $i > $f"
 		echo "Running $cmd"
 		eval $cmd
