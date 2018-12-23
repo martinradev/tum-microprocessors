@@ -55,7 +55,7 @@ static u64 __rdtscp_end(void)
 // difference in cycles / byte.
 static void generateCacheLineData(void)
 {
-    const size_t buffer_size = 128U * 1024U * 1024U;
+    const size_t buffer_size = 4U  * 1024U * 1024U;
     u8 *buffer = NULL;
     size_t step;
     size_t i;
@@ -69,7 +69,8 @@ static void generateCacheLineData(void)
     }
     FILE *inp = fopen("cache_line_data.txt", "w+");
 
-    for (step = 1U; step < 128U; ++step)
+    const size_t numSteps = 128;
+    for (step = 1U; step < numSteps; ++step)
     { 
         const size_t kNumIterations = 256;
         u64 avg = 0U;
@@ -89,9 +90,9 @@ static void generateCacheLineData(void)
             u64 time2 = __rdtscp_end();
             avg += (time2 - time1);
         }
-        avg /= kNumIterations;
-        u64 cyclesPerAccess = step * avg / buffer_size;
-        fprintf(inp, "%u %llu\n", (u32)step, (unsigned long long)(cyclesPerAccess));
+        double cyclesPerAccess = (double)step * avg / (buffer_size * kNumIterations);
+        fprintf(inp, "%u %lf\n", (u32)step, cyclesPerAccess);
+        printf("Done: %u/%u\n", (u32)step, (u32)numSteps);
     }
 
     fclose(inp);
@@ -125,22 +126,22 @@ static void generateCacheSizeData(void)
     // Here we use mmap to hopefully guarantee that the pages are locked(pinned).
     // Ideally we should be using big pages (HUGEPAGE_TLB) but that doesn't seem to be supported on my linux.
     // The L1-TLB can hold only info for 160 kb of data!
-    const size_t kMaxBlocks = 5U*1024U;
-    Block *blocks = (Block*)mmap(NULL, sizeof(Block) * kMaxBlocks, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_LOCKED|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
+    const size_t kMaxBlocks = 12*1024U*1024U;
+    Block *blocks = (Block*)mmap(NULL, sizeof(Block) * kMaxBlocks, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
     if (blocks == MAP_FAILED)
     {
         printf("Failed to allocate: %s\n", strerror(errno));
         return;
     }
 
-    FILE *inp = fopen("cache_line_data.txt", "w+");
-    for (size_t j = 64U; j < kMaxBlocks; j += 64U)
+    FILE *inp = fopen("cache_size_data.txt", "w+");
+    for (size_t j = 2U; j < kMaxBlocks; j = (j*3U)/2U)
     {
         generateRandomSequence(blocks, j);
         Block *b = NULL;
         u64 avg = 0U;
         size_t kMaxAccesses = 2*1024U*1024U;
-        size_t numSamples = 8U;
+        size_t numSamples = 4U;
         for (size_t q = 0U; q < numSamples; ++q)
         {
             b = &blocks[0];
@@ -167,6 +168,7 @@ static void generateCacheSizeData(void)
         avg /= numSamples;
         // No need to divide by the number of accesses because the number of accesses are always the same!
         fprintf(inp, "%llu %llu\n", (unsigned long long)j*sizeof(Block), (unsigned long long)avg);
+        printf("Done: %llu/%llu\n", (unsigned long long)j, (unsigned long long)kMaxBlocks);
     }
     fclose(inp);
 }
