@@ -11,3 +11,4 @@ toupper_variant*
 *.fdb_latexmk
 *.out
 *.log
+plots
