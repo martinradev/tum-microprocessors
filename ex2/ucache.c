@@ -173,9 +173,78 @@ static void generateCacheSizeData(void)
     fclose(inp);
 }
 
-int main(void)
+void printInfoFromCpuid(void)
 {
-    generateCacheLineData();
-    generateCacheSizeData();
+    // Unfortunately, my cpu doesn't have support for the extended features, so I cannot
+    // get the cache size through cpuid.
+    // Also, it seems to be necessary to process the returned data.
+    u32 eax = 0U;
+    u32 ecx = 0U;
+    u32 edx = 0U;
+    u32 ebx = 0U;
+    asm volatile(".intel_syntax noprefix\n\t"
+                 "mov eax, 0x1\n\t"
+                 "cpuid\n\t"
+                 "mov %1, ebx\n\t"
+                 ".att_syntax prefix\n\t"
+                 : "=r"(eax), "=r"(ebx), "=r"(edx), "=r"(ecx)
+                 : /* no input */
+                 : "%rax", "%rdx", "%rbx");
+    u8 clflushSize = (u8)((ebx>>8U) & 0xFFU);
+    printf("CLFLUSH size: %u\nCache line size: %u\n", clFlushSize, clFlushSize * 8U);
+}
+
+typedef enum RunTypeDecl
+{
+    RunAll,
+    RunCacheLine,
+    RunCacheSize,  
+    RunCpuidInfo
+} RunType;
+
+int main(int argc, char *argv[])
+{
+    RunType rt = RunAll;
+    for (size_t i = 1U; i < argc; ++i)
+    {
+        if (strcmp("-all", argv[i]) == 0)
+        {
+            rt = RunAll;
+        }
+        else if (strcmp("-line", argv[i]) == 0)
+        {
+            rt = RunCacheLine;
+        }
+        else if (strcmp("-size", argv[i]) == 0)
+        {
+            rt = RunCacheSize;
+        }
+        else if (strcmp("-cpuid", argv[i]) == 0)
+        {
+            rt = RunCpuidInfo;
+        }
+        else
+        {
+            return -1;
+        }
+    }
+    switch(rt)
+    {
+    case RunAll:
+        generateCacheLineData();
+        generateCacheSizeData();
+        break;
+    case RunCacheLine:
+        generateCacheLineData();
+        break;
+    case RunCacheSize:
+        generateCacheSizeData();
+        break;
+    case RunCpuidInfo:
+        printInfoFromCpuid();
+        break;
+    default:
+        break;
+    }
     return 0;
 }

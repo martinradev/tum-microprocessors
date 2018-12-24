@@ -31,3 +31,11 @@ with open("cache_size_data.txt", "r") as f:
     ax1.set_xticks(t)
     pl.show()
 
+with open("gpu_cache_line_size_data.txt", "r") as f:
+    xV, yV = readDataFromFile(f)
+    fix1, ax1 = pl.subplots()
+    pl.plot(xV, yV)
+    ax1.set(xlabel="stride", ylabel="cycles/byte", title="Cache line size")
+    pl.show()
+
+
