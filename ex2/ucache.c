@@ -105,8 +105,7 @@ static void generateCacheLineData(void)
 typedef struct BlockDecl
 {
     struct BlockDecl *next;
-    u8 value;
-    u8 padding[55U];
+    u8 padding[56U];
 } Block;
 
 void generateRandomSequence(Block *blocks, size_t numBlocks)
@@ -158,7 +157,6 @@ static void generateCacheSizeData(void)
             b = &blocks[0];
             for (size_t i = 0U; i < kMaxAccesses; ++i)
             {
-                b->value = (u8)(i&0xFFU);
                 b = b->next;
             }
             u64 t2 = __rdtscp_end();
@@ -190,7 +188,7 @@ void printInfoFromCpuid(void)
                  : "=r"(eax), "=r"(ebx), "=r"(edx), "=r"(ecx)
                  : /* no input */
                  : "%rax", "%rdx", "%rbx");
-    u8 clflushSize = (u8)((ebx>>8U) & 0xFFU);
+    u8 clFlushSize = (u8)((ebx>>8U) & 0xFFU);
     printf("CLFLUSH size: %u\nCache line size: %u\n", clFlushSize, clFlushSize * 8U);
 }
 
