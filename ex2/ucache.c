@@ -82,7 +82,7 @@ static void generateCacheLineData(void)
             {
                 // Read a dummy value. The compiler cannot optimize-out this inlined assembly.
                 asm volatile(".intel_syntax noprefix\n\t"
-                             "mov %0, BYTE PTR [%1]\n\t"
+                             "mov %0, BYTE [%1]\n\t"
                              ".att_syntax prefix\n\t"
                              : "=r"(tmp)
                              : "r"(ptr));
@@ -99,9 +99,10 @@ static void generateCacheLineData(void)
     free(buffer);
 }
 
-// Use this 64-byte sized node for a static linked list.
+// Use this 64-byte sized node for a static linked list. Make sure this struct is as big as a cache line.
 // Generating the random sequence for accesses on the go didn't prove to be effective.
 // It seemed like the hardware prefetcher could always read data ahead of time.
+// In literature this is called "P-chasing"
 typedef struct BlockDecl
 {
     struct BlockDecl *next;
@@ -167,6 +168,11 @@ static void generateCacheSizeData(void)
         // No need to divide by the number of accesses because the number of accesses are always the same!
         fprintf(inp, "%llu %llu\n", (unsigned long long)j*sizeof(Block), (unsigned long long)avg);
         printf("Done: %llu/%llu\n", (unsigned long long)j, (unsigned long long)kMaxBlocks);
+        if (b == NULL)
+        {
+            // Add this as a dependency so that the compiler cannot optimize out the loop above
+            exit(1);
+        }
     }
     fclose(inp);
 }
@@ -192,12 +198,56 @@ void printInfoFromCpuid(void)
     printf("CLFLUSH size: %u\nCache line size: %u\n", clFlushSize, clFlushSize * 8U);
 }
 
+size_t log2int(size_t pow2number)
+{
+    return __builtin_ctz(pow2number);
+}
+
+void generateL1AssociativityData(size_t cacheLineSize, size_t l1Size)
+{
+    // This is total 14+6=20 bits 
+    size_t numCacheLinesToAlloc = 1024U * 4U * 4U;
+    Block *blocks = (Block*)mmap(NULL, sizeof(Block) * numCacheLinesToAlloc, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
+    uintptr_t va = (uintptr_t)blocks;    
+    printf("Allocation virtual address is %llx\n", (unsigned long long)va);
+    size_t numLinesInCache = l1Size / cacheLineSize;
+    for (size_t i = 64; i >= 2; i/=2)
+    {
+        size_t indexPow2 = numLinesInCache / (1U << log2int(i));        
+        size_t setIndex = (va >> log2int(cacheLineSize)) & (indexPow2-1U);
+        printf("%lu-way, %lu bits for index, index is %lu\n", i, log2int(indexPow2), setIndex);
+        const size_t numIterations = 64U * 1024U * 1024U;
+        // Generate sequence.
+        Block *cBlock = blocks;
+        for (size_t j = 0U; j < i; ++j)
+        {
+            cBlock->next = cBlock + (indexPow2);
+            cBlock = cBlock->next;
+        }
+        cBlock->next = blocks;
+        cBlock = blocks;
+        u64 t1 = __rdtscp_start();
+        for (size_t j = 0U; j < numIterations; ++j)
+        {
+            cBlock = cBlock->next;
+        }
+        u64 t2 = __rdtscp_end();
+        printf("%llu\n", (unsigned long long)(t2-t1));
+        if (cBlock == NULL)
+        {
+            // Just a dependency.
+            exit(1);
+        }
+    }
+}
+
 typedef enum RunTypeDecl
 {
     RunAll,
     RunCacheLine,
     RunCacheSize,  
-    RunCpuidInfo
+    RunCpuidInfo,
+    RunCpuL1Assoc
 } RunType;
 
 int main(int argc, char *argv[])
@@ -221,6 +271,10 @@ int main(int argc, char *argv[])
         {
             rt = RunCpuidInfo;
         }
+        else if (strcmp("-l1assoc", argv[i]) == 0)
+        {
+            rt = RunCpuL1Assoc;
+        }
         else
         {
             return -1;
@@ -240,6 +294,9 @@ int main(int argc, char *argv[])
         break;
     case RunCpuidInfo:
         printInfoFromCpuid();
+        break;
+    case RunCpuL1Assoc:
+        generateL1AssociativityData(64U, 32U * 1024U);
         break;
     default:
         break;
