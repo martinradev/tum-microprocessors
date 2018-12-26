@@ -29,6 +29,7 @@ with open("cache_size_data.txt", "r") as f:
     tl = ['128B', '32KB', '256KB', '1MB', '6MB', '12MB', '24MB']
     ax1.set_xticklabels(tl)
     ax1.set_xticks(t)
+    ax1.set(xlabel="work set size", ylabel="cycles", title="Data cache size")
     pl.show()
 
 with open("icache_size_data.txt", "r") as f:
@@ -40,6 +41,7 @@ with open("icache_size_data.txt", "r") as f:
     tl = ['128B', '32KB', '256KB']
     ax1.set_xticklabels(tl)
     ax1.set_xticks(t)
+    ax1.set(xlabel="Work set size", ylabel="cycles", title="Instruction cache size")
     pl.show()
 
 

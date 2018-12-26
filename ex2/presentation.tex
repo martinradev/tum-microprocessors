@@ -78,19 +78,22 @@
 
 \usepackage{graphicx} % Allows including images
 \usepackage{booktabs} % Allows the use of \toprule, \midrule and \bottomrule in tables
+\usepackage{color, colortbl}
+\usepackage{listings}
+
+\lstdefinestyle{code}{basicstyle=\tiny, language=C, tabsize=2, numbers=left, showspaces=false, showstringspaces=false, xleftmargin=5.0ex}
 
 %----------------------------------------------------------------------------------------
 %	TITLE PAGE
 %----------------------------------------------------------------------------------------
 
-\title[Short title]{Full Title of the Talk} % The short title appears at the bottom of every slide, the full title is only on the title page
+\title[Get-to-know your system]{Get-to-know your system} % The short title appears at the bottom of every slide, the full title is only on the title page
 
-\author{John Smith} % Your name
-\institute[UCLA] % Your institution as it will appear on the bottom of every slide, may be shorthand to save space
+\author{Martin Radev} % Your name
+\institute[Microprocessors18] % Your institution as it will appear on the bottom of every slide, may be shorthand to save space
 {
-University of California \\ % Your institution for the title page
 \medskip
-\textit{john@smith.com} % Your email address
+\textit{} % Your email address
 }
 \date{\today} % Date, can be changed to a custom date
 
@@ -113,145 +116,367 @@ University of California \\ % Your institution for the title page
 \section{First Section} % Sections can be created in order to organize your presentation into discrete blocks, all sections and subsections are automatically printed in the table of contents as an overview of the talk
 %------------------------------------------------
 
-\subsection{Subsection Example} % A subsection can be created just before a set of slides with a common theme to further break down your presentation into chunks
 
 \begin{frame}
-\frametitle{Paragraphs of Text}
-Sed iaculis dapibus gravida. Morbi sed tortor erat, nec interdum arcu. Sed id lorem lectus. Quisque viverra augue id sem ornare non aliquam nibh tristique. Aenean in ligula nisl. Nulla sed tellus ipsum. Donec vestibulum ligula non lorem vulputate fermentum accumsan neque mollis.\\~\\
-
-Sed diam enim, sagittis nec condimentum sit amet, ullamcorper sit amet libero. Aliquam vel dui orci, a porta odio. Nullam id suscipit ipsum. Aenean lobortis commodo sem, ut commodo leo gravida vitae. Pellentesque vehicula ante iaculis arcu pretium rutrum eget sit amet purus. Integer ornare nulla quis neque ultrices lobortis. Vestibulum ultrices tincidunt libero, quis commodo erat ullamcorper id.
+\frametitle{Motivation}
+\begin{itemize}
+\item Vendors typically don't share all of the info for a chip
+\item At a chip company you might implement similar internal verification tests
+\item Hands-on experience with how the system works
+\end{itemize}
 \end{frame}
-
 %------------------------------------------------
 
 \begin{frame}
-\frametitle{Bullet Points}
+\frametitle{Determining cache line size}
 \begin{itemize}
-\item Lorem ipsum dolor sit amet, consectetur adipiscing elit
-\item Aliquam blandit faucibus nisi, sit amet dapibus enim tempus eu
-\item Nulla commodo, erat quis gravida posuere, elit lacus lobortis est, quis porttitor odio mauris at libero
-\item Nam cursus est eget velit posuere pellentesque
-\item Vestibulum faucibus velit a augue condimentum quis convallis nulla gravida
+\item Determine the amortized cost of reading a byte with a given stride
+\item Small stride $\rightarrow$ Cache line reuse $\rightarrow$ Small amortized cost
+\item Big stride $\rightarrow$ New cache line per read $\rightarrow$ cost of reading a line
 \end{itemize}
 \end{frame}
 
-%------------------------------------------------
-
-\begin{frame}
-\frametitle{Blocks of Highlighted Text}
-\begin{block}{Block 1}
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer lectus nisl, ultricies in feugiat rutrum, porttitor sit amet augue. Aliquam ut tortor mauris. Sed volutpat ante purus, quis accumsan dolor.
-\end{block}
-
-\begin{block}{Block 2}
-Pellentesque sed tellus purus. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Vestibulum quis magna at risus dictum tempor eu vitae velit.
-\end{block}
-
-\begin{block}{Block 3}
-Suspendisse tincidunt sagittis gravida. Curabitur condimentum, enim sed venenatis rutrum, ipsum neque consectetur orci, sed blandit justo nisi ac lacus.
-\end{block}
-\end{frame}
-
-%------------------------------------------------
-
-\begin{frame}
-\frametitle{Multiple Columns}
-\begin{columns}[c] % The "c" option specifies centered vertical alignment while the "t" option is used for top vertical alignment
-
-\column{.45\textwidth} % Left column and width
-\textbf{Heading}
-\begin{enumerate}
-\item Statement
-\item Explanation
-\item Example
-\end{enumerate}
-
-\column{.5\textwidth} % Right column and width
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer lectus nisl, ultricies in feugiat rutrum, porttitor sit amet augue. Aliquam ut tortor mauris. Sed volutpat ante purus, quis accumsan dolor.
-
-\end{columns}
-\end{frame}
-
-%------------------------------------------------
-\section{Second Section}
-%------------------------------------------------
-
-\begin{frame}
-\frametitle{Table}
-\begin{table}
-\begin{tabular}{l l l}
-\toprule
-\textbf{Treatments} & \textbf{Response 1} & \textbf{Response 2}\\
-\midrule
-Treatment 1 & 0.0003262 & 0.562 \\
-Treatment 2 & 0.0015681 & 0.910 \\
-Treatment 3 & 0.0009271 & 0.296 \\
-\bottomrule
-\end{tabular}
-\caption{Table caption}
-\end{table}
-\end{frame}
-
-%------------------------------------------------
-
-\begin{frame}
-\frametitle{Theorem}
-\begin{theorem}[Mass--energy equivalence]
-$E = mc^2$
-\end{theorem}
-\end{frame}
-
-%------------------------------------------------
-
-\begin{frame}[fragile] % Need to use the fragile option when verbatim is used in the slide
-\frametitle{Verbatim}
-\begin{example}[Theorem Slide Code]
-\begin{verbatim}
-\begin{frame}
-\frametitle{Theorem}
-\begin{theorem}[Mass--energy equivalence]
-$E = mc^2$
-\end{theorem}
-\end{frame}\end{verbatim}
-\end{example}
-\end{frame}
-
-%------------------------------------------------
-
-\begin{frame}
-\frametitle{Figure}
-Uncomment the code on this slide to include your own image from the same directory as the template .TeX file.
-%\begin{figure}
-%\includegraphics[width=0.8\linewidth]{test}
-%\end{figure}
-\end{frame}
-
-%------------------------------------------------
-
-\begin{frame}[fragile] % Need to use the fragile option when verbatim is used in the slide
-\frametitle{Citation}
-An example of the \verb|\cite| command to cite within the presentation:\\~
-
-This statement requires citation \cite{p1}.
-\end{frame}
-
-%------------------------------------------------
-
-\begin{frame}
-\frametitle{References}
-\footnotesize{
-\begin{thebibliography}{99} % Beamer does not support BibTeX so references must be inserted manually as below
-\bibitem[Smith, 2012]{p1} John Smith (2012)
-\newblock Title of the publication
-\newblock \emph{Journal Name} 12(3), 45 -- 678.
-\end{thebibliography}
+\begin{frame}[fragile]
+\frametitle{Determining cache line size}
+\begin{block}{Code}
+\begin{lstlisting}[style=code]
+for (u32 stride = 1; stride < 128; ++stride)
+{
+    u8 tmp;
+    u64 va = (u64)buffer;
+    u64 t1 = time_start();
+    for (c = 0; c < buffer_size; c += stride, va += stride)
+    {
+        asm volatile(".intel_syntax noprefix\n\t"
+                     "mov %0, BYTE [%1]\n\t"
+                     ".att_syntax prefix\n\t"
+                     : "=r"(tmp)
+                     : "r"(va));
+    }
+    u64 t2 = time_end();
+    u64 cyclesPerByte = (t2-t1) / (buffer_size / stride);
 }
+\end{lstlisting}
+\end{block}
 \end{frame}
 
-%------------------------------------------------
+\begin{frame}
+\frametitle{Cache line plot}
+\includegraphics[scale=.24]{img/cache_line_size.png}
+\end{frame}
 
 \begin{frame}
-\Huge{\centerline{The End}}
+\frametitle{Determining data cache size - idea}
+\begin{itemize}
+\item Vary size of the working set to exercise capacity misses
+\item Very small set $\rightarrow$ L1 data cache $\rightarrow$ kind of fast
+\item Small set $\rightarrow$ L2 data cache $\rightarrow$ slowish
+\item Medium set $\rightarrow$ L3 data cache $\rightarrow$ slow
+\item Big set $\rightarrow$ RAM $\rightarrow$ very slow
+\item etc
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Determining data cache size}
+\begin{itemize}
+\item Working set - continuous portion of virtual memory\\
+      Lessen conflict misses
+\item Access randomly and uniformly to avoid prefetching
+\item Typically done via \textbf{pointer chasing}
+\end{itemize}
+\begin{center}
+\includegraphics[scale=.3]{img/pchase.jpg}
+\end{center}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Pointer chasing - sequence generation}
+\begin{block}{Code}
+\begin{lstlisting}[style=code]
+typedef struct BlockDecl
+{
+    struct BlockDecl *next;
+    u8 padding[56U];
+} Block;
+
+void generateRandomSequence(Block *blocks, size_t numBlocks)
+{
+    size_t prevAddr = 0U;
+    for (size_t i = 0U; i < numBlocks; ++i)
+    {
+        size_t nextAddr = (prevAddr + numBlocks - 1U) % numBlocks;
+        blocks[prevAddr].next = &blocks[nextAddr];
+        prevAddr = nextAddr;
+    }
+}
+\end{lstlisting}
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Determining data cache size}
+\begin{block}{Code}
+\begin{lstlisting}[style=code]
+const size_t kMaxBlocks = 12*1024U*1024U;
+Block *blocks = (Block*)mmap(NULL, sizeof(Block) * kMaxBlocks, PROT_READ|PROT_WRITE,
+                             MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
+if (blocks == MAP_FAILED)
+{
+    printf("Failed to allocate: %s\n", strerror(errno));
+    return;
+}
+for (size_t j = 3U; j < kMaxBlocks; j = (j*15U)/11U)
+{
+    generateRandomSequence(blocks, j);
+    size_t kMaxAccesses = kMaxBlocks; // Make sure all blocks are accessed
+    size_t numSamples = 4U; 
+    u64 t1 = time_start()
+    Block *b = &blocks[0]; 
+    for (size_t i = 0U; i < kMaxAccesses; ++i)
+        b = b->next;
+    u64 t2 = time_end();
+    PRINT t2-t1
+    if (b == NULL) // Prevent compiler from optimizing out the loop above
+        exit(1);
+}
+
+\end{lstlisting}
+\end{block}
+\end{frame}
+
+\begin{frame}
+\frametitle{Data cache plot}
+\includegraphics[scale=.18]{img/data_size.png}
+\end{frame}
+
+\begin{frame}
+\frametitle{What about the instruction cache?}
+\begin{itemize}
+\item L1 split into I-cache and D-cache 
+\item The I-cache could have different parameters
+\item Could be determined via pointer chasing again
+\item ... But requires some hackery
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Executable virtual pages on Linux}
+Three types of pages:\\
+\begin{itemize}
+\item Readable - R
+\item Writable - W
+\item Executable - E
+\end{itemize}
+Data is typically marked as RW for security\\
+We can create a mapping tagged with RWE using mmap\\
+Thus, we can dynamically generate code and get it to execute :)\\
+Other ways out there too - modify the section headers in the exe\\
+But your AV SW might complain :)
+
+\begin{block}{Example code}
+\begin{lstlisting}[style=code]
+mmap(NULL, sizeof(Block) * kMaxBlocks,
+     PROT_READ|PROT_WRITE|PROT_EXEC,
+     MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS,
+     -1, 0U);
+\end{lstlisting}
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Pointer chasing in code}
+\begin{itemize}
+\item Same idea
+\item BUT CPU must fetch instructions from different locations, not data
+\item Thus, each cache line has to contain instructions to force the PC (EIP) to change
+\end{itemize}
+\begin{block}{Example code as it would be in memory}
+\begin{lstlisting}[style=code]
+u64 t1 = begin_time()
+Call function cache_line_1(counter)
+u64 t2 = end_time()
+print t2-t1
+... some other stuff ...
+
+func Cache_line_1(counter)
+    decrement counter
+    if (counter != 0)
+    {
+        jump to next random cache line
+    }
+    return
+
+... some garbage here ...
+... many more lines here ...
+\end{lstlisting}
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Translating the code into assembly}
+\begin{block}{Pseudo-code}
+\begin{lstlisting}[style=code]
+func Cache_line_1(counter)
+    decrement counter
+    if (counter != 0)
+    {
+        jump to next random cache line
+    }
+    return
+\end{lstlisting}
+\end{block}
+\begin{block}{The real thing?}
+\begin{lstlisting}[style=code]
+dec eax ; This modifies the flags
+jne 0xBAADA555 ; the address here varies depending on where the next line is located
+ret ; in case we don't jump, then return
+\end{lstlisting}
+\end{block}
+Not quite there yet!\\
+The CPU doesn't understand mnemonic names\\
+It understands machine code
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Translating assembly into machine code}
+The formula:\\
+\begin{itemize}
+\item Google "dec x86 encoding"
+\item Be careful of addressing mode
+\item Copy-paste byte values into your C code
+\end{itemize}
+\begin{block}{The real thing}
+FF C8 $\rightarrow$ dec eax\\
+0F 85 55 A5 AD BA $\rightarrow$ jne 0xBAADA555\\
+C3 $\rightarrow$ ret
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{Measuring L1 I-cache size}
+\begin{block}{Code}
+\begin{lstlisting}[style=code]
+for (size_t j = 64U; j < kMaxBlocks; j += 64) {
+    size_t prevAddr = 0U;
+    for (size_t i = 0; i < j; ++i) {
+        size_t nextAddr = (prevAddr + j - 1U) % j;
+        u64 nextBlockVA = (u64)(&blocks[nextAddr]);
+        u8 *block = (u8*)&blocks[prevAddr];
+        // Determine relative offset to next block
+        u64 offset = nextBlockVA - (u64)block;
+        u32 offsetU32 = (u32)(offset & 0xFFFFFFFFU);
+        u32 offsetU32Adj = offsetU32 - 8U; // 8 bytes since dec and jne take 8 bytes
+        block[0] = 0xFFU; block[1] = 0xC8U; // dec eax
+        block[2] = 0x0FU; block[3] = 0x85U; // jne
+        memcpy(&block[4], &offsetU32Adj, 4U); // relative offset
+        block[8] = 0xC3U; // ret
+        prevAddr = nextAddr;
+    }
+    u64 t1 = time_start();
+    asm volatile(".intel_syntax noprefix\n\t"
+                 "mov eax, %0\n\t"
+                 "call %1\n\t"
+                 ".att_syntax prefix\n\t"
+                 : /* no output */
+                 : "r"(kMaxAccesses), "r"((u64)blocks)
+                 : "eax", "flags");
+    u64 t2 = time_end();
+    PRINT t2-t1
+}
+
+\end{lstlisting}
+\end{block}
+\end{frame}
+
+\begin{frame}
+\frametitle{I-cache plot}
+\includegraphics[scale=.25]{img/instr_size.png}
+\end{frame}
+
+\begin{frame}
+\frametitle{Measuring L1 D-cache associativity}
+\begin{itemize}
+\item Use P-chasing again
+\item Design work set for conflict misses, not capacity misses
+\end{itemize}
+
+\begin{block}{64B line, 32 KB L1 D-cache}
+32 KB = $2^{15}$ b\\
+Let's assume 8-way associativity\\
+Sets = $2^{15}$ / ($2^{3}$ * $2^6$) = $2^6$\\
+We have: 6 bits line offset, 6 bits set index, 20 bits tag\\
+Thus, 0xBAAD\textbf{A}555 and 0xBAAD\textbf{4}555 go to the same set!
+\end{block}
+\end{frame}
+
+\begin{frame}
+\frametitle{Measuring L1 D-cache associativity - observations}
+\begin{itemize}
+\item Underestimating the assoc still generates addresses to the same set index\\
+But since the work set is small, we will have no conflicts
+\item Overestimating the assoc generates addresses to different sets\\
+Although we have a bigger working set, we will have no conflicts
+\item Thus, it's better to measure the change in cost for a bigger working set under same work set\\
+\end{itemize}
+\begin{block}{example}
+C1 = cost(many accesses 16 lines) / cost(many accesses 8 lines) for a 8-way cache\\
+C2 = cost(many accesses 8 lines) / cost(many accesses 4lines) for a 8-way cache\\
+C2 will be smaller than C1
+\end{block}
+The code is messy
+\end{frame}
+
+\begin{frame}
+\frametitle{L1 D-cache associativity plot}
+\includegraphics[scale=.25]{img/l1_d_assoc.png}
+\end{frame}
+
+\begin{frame}
+\frametitle{Timing code on x86}
+\begin{itemize}
+\item HW register for measuring time - timestamp counter
+\item Elapsed cycles since start of core
+\item Read through the \textbf{rdtsc} instruction
+\item Result stored in \textbf{eax}, \textbf{edx}
+\item Can use inline assembly or intrinsics in C/C++/etc.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{RDTSC - issues with reordering}
+\begin{block}{Problematic code}
+\colorbox{red}{... setup code ... :(} \\
+rdtsc\\
+... get data from eax, edx into var start ...\\
+\colorbox{green}{... run code to benchmark ...}\\
+rdtsc\\
+... get data from eax, edx into var end ...\\
+elapsed = end - start\\
+\colorbox{red}{... some other code ... :(}\\
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]
+\frametitle{RDTSC + CPUID - issues with reordering}
+Use CPUID to serialize
+\begin{block}{Example code}
+\colorbox{green}{... setup code ... :)} \\
+cpuid\\
+rdtsc\\
+... get data from eax, edx into var start ...\\
+\colorbox{green}{... run code to benchmark ...}\\
+rdtsc\\
+... get data from eax, edx into var end ...\\
+elapsed = end - start\\
+\colorbox{red}{... some other code ... :(}\\
+\end{block}
+\end{frame}
+
+
+
+\begin{frame}
+\Huge{\centerline{Thanks for listening}}
 \end{frame}
 
 %----------------------------------------------------------------------------------------

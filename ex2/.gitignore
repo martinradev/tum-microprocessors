@@ -5,3 +5,10 @@ cache
 gpu
 *.pdf
 *.log
+*.aux
+*.nav
+*.out
+*.vrb
+*.toc
+*.snm
+

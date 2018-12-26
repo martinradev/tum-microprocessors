@@ -21,9 +21,8 @@ static u64 __rdtscp_start(void)
 {
     u32 high, low;
     asm volatile(".intel_syntax noprefix\n\t"
-                 "mfence\n\t" /* is this necessary here? */
                  "cpuid\n\t" /* is this necessary here? */
-                 "rdtscp\n\t"
+                 "rdtsc\n\t"
                  "mov %0, edx\n\t"
                  "mov %1, eax\n\t"
                  ".att_syntax prefix\n\t"
@@ -42,7 +41,6 @@ static u64 __rdtscp_end(void)
                  "mov %0, edx\n\t"
                  "mov %1, eax\n\t"
                  "cpuid\n\t"
-                 "lfence\n\t"
                  ".att_syntax prefix\n\t"
         : "=r" (high), "=r" (low)
         :
@@ -74,11 +72,11 @@ static void generateCacheLineData(void)
     const size_t numSteps = 128;
     for (step = 1U; step < numSteps; ++step)
     { 
-        const size_t kNumIterations = 256;
+        const size_t kNumIterations = 512;
         u64 avg = 0U;
         for (i = 0U; i < kNumIterations; ++i)
         {
-            u8 *ptr = buffer;
+            u64 ptr = (u64)buffer;
             u64 time1 = __rdtscp_start();
             for (j = 0U; j < buffer_size; j += step, ptr += step)
             {
@@ -92,8 +90,8 @@ static void generateCacheLineData(void)
             u64 time2 = __rdtscp_end();
             avg += (time2 - time1);
         }
-        double cyclesPerAccess = (double)step * avg / (buffer_size * kNumIterations);
-        fprintf(inp, "%u %lf\n", (u32)step, cyclesPerAccess);
+        u64 cyclesPerAccess = step * avg / (buffer_size * kNumIterations);
+        fprintf(inp, "%u %lu\n", (u32)step, cyclesPerAccess);
         printf("Done: %u/%u\n", (u32)step, (u32)numSteps);
     }
 
@@ -156,16 +154,13 @@ static void generateInstructionCacheSizeData(void)
             // jne to next block
             block[2] = 0x0FU;
             block[3] = 0x85U;
-            block[4] = (u8)(offsetU32Adj & 0xFFU);            
-            block[5] = (u8)((offsetU32Adj>>8U) & 0xFFU);            
-            block[6] = (u8)((offsetU32Adj>>16U) & 0xFFU);            
-            block[7] = (u8)((offsetU32Adj>>24U) & 0xFFU);            
+            memcpy(&block[4], &offsetU32Adj, 4U);
             // ret
             block[8] = 0xC3U;
             prevAddr = nextAddr;
         }
         // Now add some code to go into the generated code
-        u32 kMaxAccesses = 2*1024U*1024U;
+        u32 kMaxAccesses = kMaxBlocks;
         u64 t1 = __rdtscp_start();
         asm volatile(".intel_syntax noprefix\n\t"
                      "mov eax, %0\n\t"
@@ -197,24 +192,15 @@ static void generateCacheSizeData(void)
     }
 
     FILE *inp = fopen("cache_size_data.txt", "w+");
-    for (size_t j = 2U; j < kMaxBlocks; j = (j*3U)/2U)
+    for (size_t j = 3U; j < kMaxBlocks; j = (j*15U)/11U)
     {
         generateRandomSequence(blocks, j);
         Block *b = NULL;
         u64 avg = 0U;
-        size_t kMaxAccesses = 2*1024U*1024U;
+        size_t kMaxAccesses = kMaxBlocks;
         size_t numSamples = 4U;
         for (size_t q = 0U; q < numSamples; ++q)
         {
-            b = &blocks[0];
-            // Make sure that the caches are flushed and invalidated before benchmarking.
-            // This quite costly!
-            for (size_t i = 0U; i < kMaxAccesses; ++i)
-            {
-                Block *next = b->next;
-                _mm_clflush(next);
-                b = next;
-            }
             // Measure.
             u64 t1 = __rdtscp_start();
             b = &blocks[0];
