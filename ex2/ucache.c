@@ -14,6 +14,8 @@ typedef uint8_t u8;
 typedef uint32_t u32;
 typedef uint64_t u64;
 
+#define MMAX(a,b) ((a) < (b) ? (b) : (a)) 
+
 // Call to get the number of elapsed cycles since start of processor.
 static u64 __rdtscp_start(void)
 {
@@ -120,6 +122,66 @@ void generateRandomSequence(Block *blocks, size_t numBlocks)
     }
 }
 
+static void generateInstructionCacheSizeData(void)
+{
+    const size_t kMaxBlocks = 256*1024;
+    FILE *inp = fopen("icache_size_data.txt", "w+");
+    Block *blocks = (Block*)mmap(NULL, sizeof(Block) * kMaxBlocks, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
+    if (blocks == (Block*)-1)
+    {
+        printf("Failed to alloc memory");
+        return;
+    }
+    /*
+        dec eax ; 0xFF 0xC8
+        jne ... relative address to the block ... ; We know this because we are generating the code :) ; 0x0F 0x85 ... and 32-bit relative offset ....
+        ret ; 0xC3
+    */
+
+    for (size_t j = 64U; j < kMaxBlocks; j += 64)
+    {
+        size_t prevAddr = 0U;
+        for (size_t i = 0; i < j; ++i)
+        {
+            size_t nextAddr = (prevAddr + j - 1U) % j;
+            u64 nextBlockVA = (u64)(&blocks[nextAddr]);
+            u8 *block = (u8*)&blocks[prevAddr];
+            // Determine relative offset to next block
+            u64 offset = nextBlockVA - (u64)block;
+            u32 offsetU32 = (u32)(offset & 0xFFFFFFFFU);
+            u32 offsetU32Adj = offsetU32 - 8U; // 8 bytes since dec and jne take 8 bytes
+            // dec eax
+            block[0] = 0xFFU;
+            block[1] = 0xC8U;
+            // jne to next block
+            block[2] = 0x0FU;
+            block[3] = 0x85U;
+            block[4] = (u8)(offsetU32Adj & 0xFFU);            
+            block[5] = (u8)((offsetU32Adj>>8U) & 0xFFU);            
+            block[6] = (u8)((offsetU32Adj>>16U) & 0xFFU);            
+            block[7] = (u8)((offsetU32Adj>>24U) & 0xFFU);            
+            // ret
+            block[8] = 0xC3U;
+            prevAddr = nextAddr;
+        }
+        // Now add some code to go into the generated code
+        u32 kMaxAccesses = 2*1024U*1024U;
+        u64 t1 = __rdtscp_start();
+        asm volatile(".intel_syntax noprefix\n\t"
+                     "mov eax, %0\n\t"
+                     "call %1\n\t"
+                     ".att_syntax prefix\n\t"
+                     : /* no output */
+                     : "r"(kMaxAccesses), "r"((u64)blocks) 
+                     : "eax", "flags");
+        u64 t2 = __rdtscp_end();
+        fprintf(inp, "%llu %llu\n", (unsigned long long)j*sizeof(Block), (unsigned long long)(t2-t1));
+        printf("Done: %lu/%lu\n", j, kMaxBlocks);
+    }
+    fclose(inp);    
+    munmap(blocks, sizeof(Block) * kMaxBlocks);
+}
+
 static void generateCacheSizeData(void)
 {
     // This should be 500kb.
@@ -203,41 +265,153 @@ size_t log2int(size_t pow2number)
     return __builtin_ctz(pow2number);
 }
 
-void generateL1AssociativityData(size_t cacheLineSize, size_t l1Size)
+void generateL1CacheAssociativityData(size_t cacheLineSize, size_t l1Size)
 {
-    // This is total 14+6=20 bits 
-    size_t numCacheLinesToAlloc = 1024U * 4U * 4U;
+    size_t numCacheLinesToAlloc = 1024U * 1024U * 8U;
     Block *blocks = (Block*)mmap(NULL, sizeof(Block) * numCacheLinesToAlloc, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
+    FILE *out = fopen("l1_assoc_data.txt", "w+");
+    if (blocks == (Block*)-1)
+    {
+        printf("Failed to alloc memory\n");
+        return;
+    }
+    uintptr_t va = (uintptr_t)blocks;    
+    size_t numLinesInCache = l1Size / cacheLineSize;
+    for (size_t i = 2; i <= 32; i*=2)
+    {
+        size_t indexPow2 = numLinesInCache / (1U << log2int(i));        
+        size_t setIndex = (va >> log2int(cacheLineSize)) & (indexPow2-1U);
+        const size_t numIterations = 256U * 1024U * 1024U;
+        u64 sample1 = 0U;
+        {
+            // Generate sequence.
+            Block *cBlock = blocks;
+            for (size_t j = 0U; j < i-1; ++j)
+            {
+                cBlock->next = cBlock + (indexPow2);
+                cBlock = cBlock->next;
+            }
+            cBlock->next = blocks;
+            cBlock = blocks;
+            u64 t1 = __rdtscp_start();
+            for (size_t j = 0U; j < numIterations; ++j)
+            {
+                cBlock = cBlock->next;
+            }
+            u64 t2 = __rdtscp_end();
+            sample1 = t2-t1;
+            if (cBlock == NULL)
+            {
+                // Just a dependency.
+                exit(1);
+            }
+        }
+        u64 sample2 = 0U;
+        {
+            // Generate sequence.
+            Block *cBlock = blocks;
+            for (size_t j = 0U; j < i*2-1; ++j)
+            {
+                cBlock->next = cBlock + (indexPow2);
+                cBlock = cBlock->next;
+            }
+            cBlock->next = blocks;
+            cBlock = blocks;
+            u64 t1 = __rdtscp_start();
+            for (size_t j = 0U; j < numIterations; ++j)
+            {
+                cBlock = cBlock->next;
+            }
+            u64 t2 = __rdtscp_end();
+            sample2 = t2-t1;
+            if (cBlock == NULL)
+            {
+                // Just a dependency.
+                exit(1);
+            }
+        }
+
+        fprintf(out, "%lu %lf %lu %lu\n", i, (double)sample2 / sample1, sample1, sample2);
+    }
+    fclose(out);
+}
+
+void generateL2CacheAssociativityData(size_t cacheLineSize, size_t l2Size, size_t l1Size, size_t l1Assoc)
+{
+    size_t numCacheLinesToAlloc = 1024U * 1024U * 8U;
+    Block *blocks = (Block*)mmap(NULL, sizeof(Block) * numCacheLinesToAlloc, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
+    if (blocks == (Block*)-1)
+    {
+        printf("Failed to alloc memory\n");
+        return;
+    }
     uintptr_t va = (uintptr_t)blocks;    
     printf("Allocation virtual address is %llx\n", (unsigned long long)va);
-    size_t numLinesInCache = l1Size / cacheLineSize;
-    for (size_t i = 64; i >= 2; i/=2)
+    size_t numLinesInCache = l2Size / cacheLineSize;
+    const size_t l1Bits = log2int((l1Size / (l1Assoc * cacheLineSize)));
+    for (size_t i = 2; i <= 32; i*=2)
     {
         size_t indexPow2 = numLinesInCache / (1U << log2int(i));        
         size_t setIndex = (va >> log2int(cacheLineSize)) & (indexPow2-1U);
         printf("%lu-way, %lu bits for index, index is %lu\n", i, log2int(indexPow2), setIndex);
-        const size_t numIterations = 64U * 1024U * 1024U;
-        // Generate sequence.
-        Block *cBlock = blocks;
-        for (size_t j = 0U; j < i; ++j)
+        const size_t numIterations = 256U * 1024U * 1024U;
+        u64 sample1 = 0U;
         {
-            cBlock->next = cBlock + (indexPow2);
-            cBlock = cBlock->next;
+            printf("First try\n");
+            // Generate sequence.
+            Block *cBlock = blocks;
+            printf("Access: %llx\n", (unsigned long long)cBlock);
+            for (size_t j = 0U; j < i-1; ++j)
+            {
+                cBlock->next = cBlock + indexPow2;
+                cBlock = cBlock->next;
+                printf("Access: %llx\n", (unsigned long long)cBlock);
+            }
+            cBlock->next = blocks;
+            cBlock = blocks;
+            u64 t1 = __rdtscp_start();
+            for (size_t j = 0U; j < numIterations; ++j)
+            {
+                cBlock = cBlock->next;
+            }
+            u64 t2 = __rdtscp_end();
+            sample1 = t2-t1;
+            if (cBlock == NULL)
+            {
+                // Just a dependency.
+                exit(1);
+            }
         }
-        cBlock->next = blocks;
-        cBlock = blocks;
-        u64 t1 = __rdtscp_start();
-        for (size_t j = 0U; j < numIterations; ++j)
+        u64 sample2 = 0U;
         {
-            cBlock = cBlock->next;
+            printf("Second try\n");
+            // Generate sequence.
+            Block *cBlock = blocks;
+            printf("Access: %llx\n", (unsigned long long)cBlock);
+            for (size_t j = 0U; j < i*2-1; ++j)
+            {
+                cBlock->next = cBlock + indexPow2;
+                cBlock = cBlock->next;
+                printf("Access: %llx\n", (unsigned long long)cBlock);
+            }
+            cBlock->next = blocks;
+            cBlock = blocks;
+            u64 t1 = __rdtscp_start();
+            for (size_t j = 0U; j < numIterations; ++j)
+            {
+                cBlock = cBlock->next;
+            }
+            u64 t2 = __rdtscp_end();
+            sample2 = t2-t1;
+            if (cBlock == NULL)
+            {
+                // Just a dependency.
+                exit(1);
+            }
         }
-        u64 t2 = __rdtscp_end();
-        printf("%llu\n", (unsigned long long)(t2-t1));
-        if (cBlock == NULL)
-        {
-            // Just a dependency.
-            exit(1);
-        }
+
+        printf("%lf %lu %lu\n", (double)sample2 / sample1, sample1, sample2);
+        
     }
 }
 
@@ -246,8 +420,11 @@ typedef enum RunTypeDecl
     RunAll,
     RunCacheLine,
     RunCacheSize,  
+    RunICacheSize,
     RunCpuidInfo,
-    RunCpuL1Assoc
+    RunCpuL1Assoc,
+    RunCpuL2Assoc,
+    RunCpuL3Assoc,
 } RunType;
 
 int main(int argc, char *argv[])
@@ -267,6 +444,10 @@ int main(int argc, char *argv[])
         {
             rt = RunCacheSize;
         }
+        else if (strcmp("-isize", argv[i]) == 0)
+        {
+            rt = RunICacheSize;
+        }
         else if (strcmp("-cpuid", argv[i]) == 0)
         {
             rt = RunCpuidInfo;
@@ -274,6 +455,14 @@ int main(int argc, char *argv[])
         else if (strcmp("-l1assoc", argv[i]) == 0)
         {
             rt = RunCpuL1Assoc;
+        }
+        else if (strcmp("-l2assoc", argv[i]) == 0)
+        {
+            rt = RunCpuL2Assoc;
+        }
+        else if (strcmp("-l3assoc", argv[i]) == 0)
+        {
+            rt = RunCpuL3Assoc;
         }
         else
         {
@@ -296,7 +485,16 @@ int main(int argc, char *argv[])
         printInfoFromCpuid();
         break;
     case RunCpuL1Assoc:
-        generateL1AssociativityData(64U, 32U * 1024U);
+        generateL1CacheAssociativityData(64U /* line size */, 32U * 1024U /*l1 cache size*/);
+        break;
+    case RunCpuL2Assoc:
+        generateL2CacheAssociativityData(64U /* line size */, 256U * 1024U /* l2 cache size */, 32*1024U /* l1 cache size */, 8U /* l1 associativy */);
+        break;
+    case RunCpuL3Assoc:
+        //generateCacheAssociativityData(64U, 12U * 1024U * 1024U);
+        break;
+    case RunICacheSize:
+        generateInstructionCacheSizeData();
         break;
     default:
         break;

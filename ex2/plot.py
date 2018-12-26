@@ -31,6 +31,29 @@ with open("cache_size_data.txt", "r") as f:
     ax1.set_xticks(t)
     pl.show()
 
+with open("icache_size_data.txt", "r") as f:
+    xV, yV = readDataFromFile(f)
+    fig, ax1 = pl.subplots()
+    ax1.plot(xV, yV)
+    ax1.set_xscale('log')
+    t = [128, 32*1024, 256*1024]
+    tl = ['128B', '32KB', '256KB']
+    ax1.set_xticklabels(tl)
+    ax1.set_xticks(t)
+    pl.show()
+
+
+with open("l1_assoc_data.txt", "r") as f:
+    xV, yV = readDataFromFile(f)
+    fig, ax1 = pl.subplots()
+    ax1.plot(xV, yV)
+    ax1.set_xscale('log')
+    t = [2**i for i in range(0,7)]
+    tl = [str(i) + "way" for i in t]
+    ax1.set_xticklabels(tl)
+    ax1.set_xticks(t)
+    pl.show()
+
 with open("gpu_cache_line_size_data.txt", "r") as f:
     xV, yV = readDataFromFile(f)
     fix1, ax1 = pl.subplots()
