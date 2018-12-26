@@ -1,2 +1,7 @@
 cache
 *.s
+*.swp
+*.txt
+gpu
+*.pdf
+*.log
