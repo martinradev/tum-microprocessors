@@ -55,7 +55,7 @@ static u64 __rdtscp_end(void)
 // difference in cycles / byte.
 static void generateCacheLineData(void)
 {
-    const size_t buffer_size = 4U  * 1024U * 1024U;
+    const size_t buffer_size = 2*1024U * 1024U;
     u8 *buffer = NULL;
     size_t step;
     size_t i;
@@ -70,7 +70,28 @@ static void generateCacheLineData(void)
     FILE *inp = fopen("cache_line_data.txt", "w+");
 
     const size_t numSteps = 256;
-    for (step = 1U; step < numSteps; ++step)
+
+    {
+        // Warm-up
+        const size_t kNumIterations = 1024U * 1024U * 8U;
+            u64 time1 = __rdtscp_start();
+            j = 0U;
+            for (i = 0U; i < kNumIterations; ++i)
+            {
+                u64 ptr = (u64)(buffer + j);
+                // Read a dummy value. The compiler cannot optimize-out this inlined assembly.
+                asm volatile(".intel_syntax noprefix\n\t"
+                             "mov %0, BYTE [%1]\n\t"
+                             ".att_syntax prefix\n\t"
+                             : "=r"(tmp)
+                             : "r"(ptr));
+                j = (j + step) % buffer_size;
+            }
+            u64 time2 = __rdtscp_end();
+ 
+    }
+
+    for (step = 1U; step < numSteps; step += 1U)
     { 
         const size_t kNumIterations = 1024U * 1024U * 8U;
             u64 time1 = __rdtscp_start();
