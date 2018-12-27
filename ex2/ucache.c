@@ -69,29 +69,26 @@ static void generateCacheLineData(void)
     }
     FILE *inp = fopen("cache_line_data.txt", "w+");
 
-    const size_t numSteps = 128;
+    const size_t numSteps = 256;
     for (step = 1U; step < numSteps; ++step)
     { 
-        const size_t kNumIterations = 512;
-        u64 avg = 0U;
-        for (i = 0U; i < kNumIterations; ++i)
-        {
-            u64 ptr = (u64)buffer;
+        const size_t kNumIterations = 1024U * 1024U * 8U;
             u64 time1 = __rdtscp_start();
-            for (j = 0U; j < buffer_size; j += step, ptr += step)
+            j = 0U;
+            for (i = 0U; i < kNumIterations; ++i)
             {
+                u64 ptr = (u64)(buffer + j);
                 // Read a dummy value. The compiler cannot optimize-out this inlined assembly.
                 asm volatile(".intel_syntax noprefix\n\t"
                              "mov %0, BYTE [%1]\n\t"
                              ".att_syntax prefix\n\t"
                              : "=r"(tmp)
                              : "r"(ptr));
+                j = (j + step) % buffer_size;
             }
             u64 time2 = __rdtscp_end();
-            avg += (time2 - time1);
-        }
-        u64 cyclesPerAccess = step * avg / (buffer_size * kNumIterations);
-        fprintf(inp, "%u %lu\n", (u32)step, cyclesPerAccess);
+        double cyclesPerAccess = (double)(time2-time1) / kNumIterations;
+        fprintf(inp, "%u %lf\n", (u32)step, cyclesPerAccess);
         printf("Done: %u/%u\n", (u32)step, (u32)numSteps);
     }
 
