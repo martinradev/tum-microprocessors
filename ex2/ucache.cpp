@@ -510,6 +510,95 @@ void measureL1dtlb(size_t setIndexBits)
     fclose(out);
 }
 
+static void generateInstructionTLBSizeData(size_t setIndexBits)
+{
+    using PageBlock = SizedBlock<4096U>;
+    const size_t kMaxBlocks = 256*1024;
+    FILE *inp = fopen("itlb_size_data.txt", "w+");
+    PageBlock *blocks = (PageBlock*)mmap(NULL, sizeof(PageBlock) * kMaxBlocks, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
+    if (blocks == (PageBlock*)-1)
+    {
+        printf("Failed to alloc memory");
+        return;
+    }
+    /*
+        dec eax ; 0xFF 0xC8
+        jne ... relative address to the block ... ; We know this because we are generating the code :) ; 0x0F 0x85 ... and 32-bit relative offset ....
+        ret ; 0xC3
+    */
+
+
+    for (size_t j = 2U; j < 1024; ++j)
+    {
+        std::vector<size_t> seq(j-1);
+        for (size_t i = 0; i < j-1; ++i)
+        {
+            seq[i] = i+1;
+        }
+        std::shuffle(seq.begin(), seq.end(), std::default_random_engine(111U));
+        
+        size_t setIndex = 1U;
+        PageBlock *prevBlock = blocks;
+        for (size_t i = 0; i < j-1; ++i)
+        {
+            size_t nextAddr = seq[i];
+            SizedBlock<64> *line = (SizedBlock<64>*)&blocks[nextAddr];
+            line += setIndex;
+            PageBlock *nextBlock = (PageBlock*)line;
+
+            u64 nextBlockVA = (u64)(nextBlock);
+            u8 *block = (u8*)prevBlock;
+            // Determine relative offset to next block
+            u64 offset = nextBlockVA - (u64)block;
+            u32 offsetU32 = (u32)(offset & 0xFFFFFFFFU);
+            u32 offsetU32Adj = offsetU32 - 8U; // 8 bytes since dec and jne take 8 bytes
+            // dec eax
+            block[0] = 0xFFU;
+            block[1] = 0xC8U;
+            // jne to next block
+            block[2] = 0x0FU;
+            block[3] = 0x85U;
+            memcpy(&block[4], &offsetU32Adj, 4U);
+            // ret
+            block[8] = 0xC3U;
+
+            prevBlock = nextBlock;
+            setIndex = (setIndex + 1U) % (1U << setIndexBits);
+        }
+        {
+            u64 nextBlockVA = (u64)(blocks);
+            u8 *block = (u8*)prevBlock;
+            // Determine relative offset to next block
+            u64 offset = nextBlockVA - (u64)block;
+            u32 offsetU32 = (u32)(offset & 0xFFFFFFFFU);
+            u32 offsetU32Adj = offsetU32 - 8U; // 8 bytes since dec and jne take 8 bytes
+            // dec eax
+            block[0] = 0xFFU;
+            block[1] = 0xC8U;
+            // jne to next block
+            block[2] = 0x0FU;
+            block[3] = 0x85U;
+            memcpy(&block[4], &offsetU32Adj, 4U);
+            // ret
+            block[8] = 0xC3U;               
+        }
+        // Now add some code to go into the generated code
+        u32 kMaxAccesses = 2 * 1024 * 1024;
+        u64 t1 = __rdtscp_start();
+        asm volatile(".intel_syntax noprefix\n\t"
+                     "mov eax, %0\n\t"
+                     "call %1\n\t"
+                     ".att_syntax prefix\n\t"
+                     : /* no output */
+                     : "r"(kMaxAccesses), "r"((u64)blocks) 
+                     : "eax", "flags");
+        u64 t2 = __rdtscp_end();
+        fprintf(inp, "%llu %llu\n", (unsigned long long)j, (unsigned long long)(t2-t1));
+    }
+    fclose(inp);    
+    munmap(blocks, sizeof(Block) * kMaxBlocks);
+}
+
 typedef enum RunTypeDecl
 {
     RunAll,
@@ -521,6 +610,7 @@ typedef enum RunTypeDecl
     RunCpuL2Assoc,
     RunCpuL3Assoc,
     RunDTLB,
+    RunITLB,
 } RunType;
 
 int main(int argc, char *argv[])
@@ -564,6 +654,10 @@ int main(int argc, char *argv[])
         {
             rt = RunDTLB;
         }
+        else if(strcmp("-itlb", argv[i]) == 0)
+        {
+            rt = RunITLB;
+        }
         else
         {
             return -1;
@@ -599,6 +693,9 @@ int main(int argc, char *argv[])
     case RunDTLB:    
         // This has to be changed. It's hardcoded for Sandy Bridge :)
         measureL1dtlb(6U);
+        break;
+    case RunITLB:
+        generateInstructionTLBSizeData(6U);
         break;
     default:
         break;

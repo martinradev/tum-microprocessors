@@ -20,6 +20,14 @@ with open("l1_dtlb_size.txt", "r") as f:
     ax1.set(xlabel="Num 4K pages", ylabel="cycles/byte", title="D-TLB size")
     pl.show()
 
+with open("itlb_size_data.txt", "r") as f:
+    xV, yV = readDataFromFile(f)
+    fix1, ax1 = pl.subplots()
+    pl.plot(xV, yV)
+    ax1.set_xticks([0, 64, 128, 256, 512, 1024])
+    ax1.set(xlabel="Num 4K pages", ylabel="cycles/byte", title="I-TLB size")
+    pl.show()
+
    
 with open("cache_line_data.txt", "r") as f:
     xV, yV = readDataFromFile(f)
