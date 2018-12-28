@@ -12,6 +12,7 @@
 #include <vector>
 #include <algorithm>
 #include <random>
+#include <array>
 
 typedef uint8_t u8;
 typedef uint32_t u32;
@@ -58,7 +59,7 @@ static u64 __rdtscp_end(void)
 // difference in cycles / byte.
 static void generateCacheLineData(void)
 {
-    const size_t buffer_size = 1024U * 1024U * 16U;
+    const size_t buffer_size = 1024U * 1024U * 4U;
     u8 *buffer = NULL;
     size_t step;
     size_t i;
@@ -437,6 +438,78 @@ void generateL2CacheAssociativityData(size_t cacheLineSize, size_t l2Size, size_
     }
 }
 
+template<size_t T>
+struct SizedBlock
+{
+    SizedBlock<T> *next;
+    u8 padding[T-sizeof(SizedBlock*)];
+};
+
+template<size_t SZ>
+void generateSizedRandomSequence(SizedBlock<SZ> *blocks, size_t numBlocks, size_t setIndexBits)
+{
+    std::vector<size_t> seq(numBlocks-1);
+    for (size_t i = 0; i < numBlocks-1; ++i)
+    {
+        seq[i] = i+1;
+    }
+    std::shuffle(seq.begin(), seq.end(), std::default_random_engine(111U));
+    size_t setIndex = 1U;
+    SizedBlock<SZ> *prevBlock = blocks;
+    for (size_t i = 0U; i < numBlocks - 1; ++i)
+    {
+        size_t nextAddr = seq[i];
+        SizedBlock<64> *line = (SizedBlock<64>*)&blocks[nextAddr];    
+        line += setIndex;
+        SizedBlock<SZ> *nextBlock = (SizedBlock<SZ>*)(line);
+        prevBlock->next = nextBlock;
+        prevBlock = nextBlock;
+        setIndex = (setIndex + 1U) % (1U << setIndexBits);
+    }
+    prevBlock->next = blocks;
+    prevBlock = blocks;
+    for (size_t i = 0U; i < numBlocks; ++i)
+    {
+        prevBlock = prevBlock->next;
+    }
+}
+
+void measureL1dtlb(size_t setIndexBits)
+{
+    using PageBlock = SizedBlock<4096U>;
+    size_t numBlocksToAlloc = 1024U*256U;
+    PageBlock *blocks = (PageBlock*)mmap(NULL, sizeof(PageBlock) * numBlocksToAlloc, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
+    if (blocks == (PageBlock*)-1)
+    {
+        printf("Failed to alloc memory\n");
+        return;
+    }
+    FILE *out = fopen("l1_dtlb_size.txt", "w+");
+    for (size_t sz = 2U; sz < 1024U; ++sz)
+    {
+        generateSizedRandomSequence(blocks, sz, setIndexBits);
+        const u64 numIterations = 4U * 1024U * 1024U;
+        PageBlock *cBlock = blocks;
+        for (u64 i = 0; i < numIterations; ++i)
+        {
+            cBlock = cBlock->next;
+        }
+        u64 t1 = __rdtscp_start();
+        for (u64 i = 0; i < numIterations; ++i)
+        {
+            cBlock = cBlock->next;
+        }
+        u64 t2 = __rdtscp_end();
+        fprintf(out, "%lu %lu\n", sz, (t2-t1) / numIterations);
+        if (!cBlock)
+        {
+            exit(1);
+        }
+    }
+
+    fclose(out);
+}
+
 typedef enum RunTypeDecl
 {
     RunAll,
@@ -447,6 +520,7 @@ typedef enum RunTypeDecl
     RunCpuL1Assoc,
     RunCpuL2Assoc,
     RunCpuL3Assoc,
+    RunDTLB,
 } RunType;
 
 int main(int argc, char *argv[])
@@ -486,6 +560,10 @@ int main(int argc, char *argv[])
         {
             rt = RunCpuL3Assoc;
         }
+        else if(strcmp("-dtlb", argv[i]) == 0)
+        {
+            rt = RunDTLB;
+        }
         else
         {
             return -1;
@@ -517,6 +595,10 @@ int main(int argc, char *argv[])
         break;
     case RunICacheSize:
         generateInstructionCacheSizeData();
+        break;
+    case RunDTLB:    
+        // This has to be changed. It's hardcoded for Sandy Bridge :)
+        measureL1dtlb(6U);
         break;
     default:
         break;
