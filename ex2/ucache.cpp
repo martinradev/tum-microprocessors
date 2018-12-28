@@ -9,6 +9,9 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <vector>
+#include <algorithm>
+#include <random>
 
 typedef uint8_t u8;
 typedef uint32_t u32;
@@ -55,7 +58,7 @@ static u64 __rdtscp_end(void)
 // difference in cycles / byte.
 static void generateCacheLineData(void)
 {
-    const size_t buffer_size = 2*1024U * 1024U;
+    const size_t buffer_size = 1024U * 1024U * 16U;
     u8 *buffer = NULL;
     size_t step;
     size_t i;
@@ -129,10 +132,17 @@ typedef struct BlockDecl
 
 void generateRandomSequence(Block *blocks, size_t numBlocks)
 {
+    std::vector<size_t> seq(numBlocks-1);
+    for (size_t i = 1; i < numBlocks; ++i)
+    {
+        seq[i-1] = i;
+    }
+    std::shuffle(seq.begin(), seq.end(), std::default_random_engine(111U));
+    seq.push_back(0);
     size_t prevAddr = 0U;
     for (size_t i = 0U; i < numBlocks; ++i)
     {
-        size_t nextAddr = (prevAddr + numBlocks - 1U) % numBlocks;
+        size_t nextAddr = seq[i];
         blocks[prevAddr].next = &blocks[nextAddr];
         prevAddr = nextAddr;
     }
@@ -154,12 +164,20 @@ static void generateInstructionCacheSizeData(void)
         ret ; 0xC3
     */
 
+
     for (size_t j = 64U; j < kMaxBlocks; j += 64)
     {
         size_t prevAddr = 0U;
+        std::vector<size_t> seq(j-1);
+        for (size_t i = 1; i < j; ++i)
+        {
+            seq[i-1] = i;
+        }
+        std::shuffle(seq.begin(), seq.end(), std::default_random_engine(111U));
+        seq.push_back(0);
         for (size_t i = 0; i < j; ++i)
         {
-            size_t nextAddr = (prevAddr + j - 1U) % j;
+            size_t nextAddr = seq[i];
             u64 nextBlockVA = (u64)(&blocks[nextAddr]);
             u8 *block = (u8*)&blocks[prevAddr];
             // Determine relative offset to next block

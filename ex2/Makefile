@@ -1,10 +1,10 @@
 all: cache asm
 
-cache: ucache.c
-	gcc ucache.c -O2 -Werror -o cache
+cache: ucache.cpp
+	g++ ucache.cpp -O2 -Werror -std=c++11 -o cache
 
-asm: ucache.c
-	gcc ucache.c -O2 -Werror -S -masm=intel -o cache_asm.s
+asm: ucache.cpp
+	gcc ucache.cpp -O2 -Werror -S -masm=intel --std=c++11 -o cache_asm.s
 
 gpu: gpu.cu
 	nvcc gpu.cu -O2 -o gpu
