@@ -528,7 +528,7 @@ static void generateInstructionTLBSizeData(size_t setIndexBits)
     */
 
 
-    for (size_t j = 2U; j < 1024; ++j)
+    for (size_t j = 2U; j < 256; ++j)
     {
         std::vector<size_t> seq(j-1);
         for (size_t i = 0; i < j-1; ++i)
