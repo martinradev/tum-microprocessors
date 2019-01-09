@@ -12,38 +12,28 @@ def readDataFromFile(f):
         yV.append(y)
     return xV, yV
 
-with open("l1_dtlb_size.txt", "r") as f:
+with open("l1_dtlb_size.txt", "r") as f, open("l1_dtlb2mb_size.txt") as f2:
     xV, yV = readDataFromFile(f)
     fix1, ax1 = pl.subplots()
-    pl.plot(xV, yV)
+    dtlb4k, = pl.plot(xV, yV)
+    xV, yV = readDataFromFile(f2)
+    dtlb2mb, = pl.plot(xV,yV);
     ax1.set_xticks([0, 32, 64, 256, 512, 1024])
-    ax1.set(xlabel="Num 4KB pages", ylabel="cycles/byte", title="D-TLB size")
+    ax1.set(xlabel="Num pages", ylabel="cycles/access", title="D-TLB size")
+    pl.legend([dtlb4k, dtlb2mb], ["4KB page", "2MB page"])
     pl.show()
 
-with open("l1_dtlb2mb_size.txt", "r") as f:
+with open("itlb_size_data.txt", "r") as f, open("itlb2mb_size_data.txt", "r") as f2:
     xV, yV = readDataFromFile(f)
     fix1, ax1 = pl.subplots()
-    pl.plot(xV, yV)
-    ax1.set_xticks([0, 32, 64, 256, 512, 1024])
-    ax1.set(xlabel="Num 2MB pages", ylabel="cycles/byte", title="D-TLB size")
-    pl.show()
-
-with open("itlb_size_data.txt", "r") as f:
-    xV, yV = readDataFromFile(f)
-    fix1, ax1 = pl.subplots()
-    pl.plot(xV, yV)
+    itlb4k, = pl.plot(xV, yV)
+    xV, yV = readDataFromFile(f2)
+    itlb2mb, = pl.plot(xV, yV)
     ax1.set_xticks([0, 8, 64, 128, 256])
-    ax1.set(xlabel="Num 4KB pages", ylabel="cycles/byte", title="I-TLB size")
+    ax1.set(xlabel="Num pages", ylabel="cycles/access", title="I-TLB size")
+    pl.legend([dtlb4k, dtlb2mb], ["4KB page", "2MB page"])
     pl.show()
 
-with open("itlb2mb_size_data.txt", "r") as f:
-    xV, yV = readDataFromFile(f)
-    fix1, ax1 = pl.subplots()
-    pl.plot(xV, yV)
-    ax1.set_xticks([0, 8, 64, 128, 256])
-    ax1.set(xlabel="Num 2MB pages", ylabel="cycles/byte", title="I-TLB size")
-    pl.show()
-   
 with open("cache_line_data.txt", "r") as f:
     xV, yV = readDataFromFile(f)
     fix1, ax1 = pl.subplots()

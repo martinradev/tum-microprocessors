@@ -603,7 +603,7 @@ static void generateInstructionTLBSizeData(size_t setIndexBits, const size_t kMa
                      : "r"(kMaxAccesses), "r"((u64)blocks) 
                      : "eax", "flags");
         u64 t2 = __rdtscp_end();
-        fprintf(inp, "%llu %llu\n", (unsigned long long)j, (unsigned long long)(t2-t1));
+        fprintf(inp, "%llu %llu\n", (unsigned long long)j, (unsigned long long)(t2-t1)/kMaxAccesses);
     }
     fclose(inp);    
     munmap(blocks, sizeof(Block) * kMaxBlocks);
