@@ -474,17 +474,18 @@ void generateSizedRandomSequence(SizedBlock<SZ> *blocks, size_t numBlocks, size_
     }
 }
 
-void measureL1dtlb(size_t setIndexBits)
+template<size_t PageSize>
+void measureL1dtlb(size_t setIndexBits, size_t numPages, const char *fileName, int tlbFlags)
 {
-    using PageBlock = SizedBlock<4096U>;
-    size_t numBlocksToAlloc = 1024U*256U;
-    PageBlock *blocks = (PageBlock*)mmap(NULL, sizeof(PageBlock) * numBlocksToAlloc, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
+    using PageBlock = SizedBlock<PageSize>;
+    size_t numBlocksToAlloc = numPages;
+    PageBlock *blocks = (PageBlock*)mmap(NULL, sizeof(PageBlock) * numBlocksToAlloc, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS|tlbFlags, -1, 0U);
     if (blocks == (PageBlock*)-1)
     {
         printf("Failed to alloc memory\n");
         return;
     }
-    FILE *out = fopen("l1_dtlb_size.txt", "w+");
+    FILE *out = fopen(fileName, "w+");
     for (size_t sz = 2U; sz < 1024U; ++sz)
     {
         generateSizedRandomSequence(blocks, sz, setIndexBits);
@@ -510,12 +511,12 @@ void measureL1dtlb(size_t setIndexBits)
     fclose(out);
 }
 
-static void generateInstructionTLBSizeData(size_t setIndexBits)
+template<size_t PageSize>
+static void generateInstructionTLBSizeData(size_t setIndexBits, const size_t kMaxBlocks, const char *fileName, int tlbFlags)
 {
-    using PageBlock = SizedBlock<4096U>;
-    const size_t kMaxBlocks = 256*1024;
-    FILE *inp = fopen("itlb_size_data.txt", "w+");
-    PageBlock *blocks = (PageBlock*)mmap(NULL, sizeof(PageBlock) * kMaxBlocks, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
+    using PageBlock = SizedBlock<PageSize>;
+    FILE *inp = fopen(fileName, "w+");
+    PageBlock *blocks = (PageBlock*)mmap(NULL, sizeof(PageBlock) * kMaxBlocks, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS|tlbFlags, -1, 0U);
     if (blocks == (PageBlock*)-1)
     {
         printf("Failed to alloc memory");
@@ -583,7 +584,16 @@ static void generateInstructionTLBSizeData(size_t setIndexBits)
             block[8] = 0xC3U;               
         }
         // Now add some code to go into the generated code
-        u32 kMaxAccesses = 2 * 1024 * 1024;
+        u32 kMaxAccesses = 8 * 1024 * 1024;
+        // Warm-up
+        asm volatile(".intel_syntax noprefix\n\t"
+                     "mov eax, %0\n\t"
+                     "call %1\n\t"
+                     ".att_syntax prefix\n\t"
+                     : /* no output */
+                     : "r"(kMaxAccesses), "r"((u64)blocks) 
+                     : "eax", "flags");
+
         u64 t1 = __rdtscp_start();
         asm volatile(".intel_syntax noprefix\n\t"
                      "mov eax, %0\n\t"
@@ -610,7 +620,9 @@ typedef enum RunTypeDecl
     RunCpuL2Assoc,
     RunCpuL3Assoc,
     RunDTLB,
+    RunDTLB2MB,
     RunITLB,
+    RunITLB2MB,
 } RunType;
 
 int main(int argc, char *argv[])
@@ -658,6 +670,14 @@ int main(int argc, char *argv[])
         {
             rt = RunITLB;
         }
+        else if(strcmp("-dtlb2mb", argv[i]) == 0)
+        {
+            rt = RunDTLB2MB;
+        }
+        else if(strcmp("-itlb2mb", argv[i]) == 0)
+        {
+            rt = RunITLB2MB;
+        }
         else
         {
             return -1;
@@ -665,10 +685,6 @@ int main(int argc, char *argv[])
     }
     switch(rt)
     {
-    case RunAll:
-        generateCacheLineData();
-        generateCacheSizeData();
-        break;
     case RunCacheLine:
         generateCacheLineData();
         break;
@@ -692,10 +708,16 @@ int main(int argc, char *argv[])
         break;
     case RunDTLB:    
         // This has to be changed. It's hardcoded for Sandy Bridge :)
-        measureL1dtlb(6U);
+        measureL1dtlb<4096U>(6U, 256*1024, "l1_dtlb_size.txt", 0);
+        break;
+    case RunDTLB2MB:
+        measureL1dtlb<1024U*1024U*2U>(6U, 1024U, "l1_dtlb2mb_size.txt", MAP_HUGETLB);
         break;
     case RunITLB:
-        generateInstructionTLBSizeData(6U);
+        generateInstructionTLBSizeData<4096U>(6U, 256U*1024U, "itlb_size_data.txt", 0);
+        break;
+    case RunITLB2MB:
+        generateInstructionTLBSizeData<2U*1024U*1024U>(6U, 1024U, "itlb2mb_size_data.txt", MAP_HUGETLB);
         break;
     default:
         break;

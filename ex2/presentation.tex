@@ -340,7 +340,7 @@ func Cache_line_1(counter)
 \begin{block}{The real thing?}
 \begin{lstlisting}[style=code]
 dec eax ; This modifies the flags
-jne 0xBAADA555 ; the address here varies depending on where the next line is located
+jne 0xAABBCCDD ; the address here varies depending on where the next line is located
 ret ; in case we don't jump, then return
 \end{lstlisting}
 \end{block}
@@ -359,7 +359,7 @@ The formula:\\
 \end{itemize}
 \begin{block}{The real thing}
 FF C8 $\rightarrow$ dec eax\\
-0F 85 55 A5 AD BA $\rightarrow$ jne 0xBAADA555\\
+0F 85 DD CC BB AA $\rightarrow$ jne 0xAABBCCDD\\
 C3 $\rightarrow$ ret
 \end{block}
 \end{frame}
@@ -417,7 +417,7 @@ for (size_t j = 64U; j < kMaxBlocks; j += 64) {
 Let's assume 8-way associativity\\
 Sets = $2^{15}$ / ($2^{3}$ * $2^6$) = $2^6$\\
 We have: 6 bits line offset, 6 bits set index, 20 bits tag\\
-Thus, 0xBAAD\textbf{A}555 and 0xBAAD\textbf{4}555 go to the same set!
+Thus, 0xAABB\textbf{C}CDD and 0xAABB\textbf{D}CDD go to the same set!
 \end{block}
 \end{frame}
 
@@ -430,7 +430,7 @@ Thus, 0xBAAD\textbf{A}555 and 0xBAAD\textbf{4}555 go to the same set!
 But since the work set is small, we will have no conflicts
 \item Overestimating the assoc generates addresses to different sets\\
 Although we have a bigger working set, we will have no conflicts
-\item Thus, it's better to measure the change in cost for a bigger working set under same #Ways\\
+\item Thus, it's better to measure the change in cost for a bigger working set under same \#Ways\\
 \end{itemize}
 \begin{block}{example}
 C1 = cost(many accesses 16 lines) / cost(many accesses 8 lines) for a 8-way cache\\
@@ -451,7 +451,7 @@ The code is messy
 \frametitle{Performance is not only about the I/D-cache}
 \begin{itemize}
 \item Modern systems have to translate virtual addresses to physical
-\item Privilege level has to checked
+\item Privilege level has to be checked
 \item Requires caching again, but at a different granularity\\
 $\rightarrow$ page granularity
 \item TLB - translation lookaside buffer
@@ -467,8 +467,8 @@ $\rightarrow$ page granularity
 Think your x86 CPU. Or even better, your GPU :)
 \item To reduce TLB misses, just have bigger pages\\
 On x86: 4KB, 2MB, 1GB
-\item 4KB page: 0xBAADA555 = BAADA (tag) . 555 (page offset)\\
-Important: 555 is also the concatenation of cache set index and line offset on current Intel processors\\
+\item 4KB page: 0xAABBCCDD = AABBC (tag) . CDD (page offset)\\
+Important: CDD is also the concatenation of cache set index and line offset on current Intel processors\\
 \end{itemize}
 \end{frame}
 
@@ -489,22 +489,32 @@ As we increase the working set, we will start thrashing the L1/L2 TLBs
 \end{frame}
 
 \begin{frame}
-\frametitle{D-TLB - Sandy Bridge}
+\frametitle{D-TLB - 4 KB page - Sandy Bridge}
 \includegraphics[scale=.18]{img/dtlb_size.png}
 \end{frame}
 
 \begin{frame}
-\frametitle{D-TLB - Ryzen 2700X}
+\frametitle{D-TLB - 2 MB page - Haswell}
+\includegraphics[scale=.24]{img/dtlb_2mb_size.png}
+\end{frame}
+
+\begin{frame}
+\frametitle{D-TLB - 4 KB page - Ryzen 2700X}
 \includegraphics[scale=.18]{img/dtlb_size_zen.png}
 \end{frame}
 
 \begin{frame}
-\frametitle{I-TLB - Sandy Bridge}
+\frametitle{I-TLB - 4 KB page - Sandy Bridge}
 \includegraphics[scale=.18]{img/itlb_size.png}
 \end{frame}
 
 \begin{frame}
-\frametitle{I-TLB - Ryzen 2700X}
+\frametitle{I-TLB - 2 MB page - Haswell}
+\includegraphics[scale=.24]{img/itlb_2mb_size.png}
+\end{frame}
+
+\begin{frame}
+\frametitle{I-TLB - 4 KB page - Ryzen 2700X}
 \includegraphics[scale=.18]{img/itlb_size_zen.png}
 \end{frame}
 
