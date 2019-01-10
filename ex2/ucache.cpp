@@ -475,10 +475,10 @@ void generateSizedRandomSequence(SizedBlock<SZ> *blocks, size_t numBlocks, size_
 }
 
 template<size_t PageSize>
-void measureL1dtlb(size_t setIndexBits, size_t numPages, const char *fileName, int tlbFlags)
+void measureL1dtlb(size_t setIndexBits, const char *fileName, int tlbFlags)
 {
     using PageBlock = SizedBlock<PageSize>;
-    size_t numBlocksToAlloc = numPages;
+    size_t numBlocksToAlloc = 2048;
     PageBlock *blocks = (PageBlock*)mmap(NULL, sizeof(PageBlock) * numBlocksToAlloc, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS|tlbFlags, -1, 0U);
     if (blocks == (PageBlock*)-1)
     {
@@ -486,10 +486,10 @@ void measureL1dtlb(size_t setIndexBits, size_t numPages, const char *fileName, i
         return;
     }
     FILE *out = fopen(fileName, "w+");
-    for (size_t sz = 2U; sz < 1024U; ++sz)
+    for (size_t sz = 2U; sz < 2*1024U; ++sz)
     {
-        generateSizedRandomSequence(blocks, sz, setIndexBits);
-        const u64 numIterations = 4U * 1024U * 1024U;
+        generateSizedRandomSequence<PageSize>(blocks, sz, setIndexBits);
+        const u64 numIterations = 8U * 1024U * 1024U;
         PageBlock *cBlock = blocks;
         for (u64 i = 0; i < numIterations; ++i)
         {
@@ -708,10 +708,10 @@ int main(int argc, char *argv[])
         break;
     case RunDTLB:    
         // This has to be changed. It's hardcoded for Sandy Bridge :)
-        measureL1dtlb<4096U>(6U, 256*1024, "l1_dtlb_size.txt", 0);
+        measureL1dtlb<4096U>(6U, "l1_dtlb_size.txt", 0);
         break;
     case RunDTLB2MB:
-        measureL1dtlb<1024U*1024U*2U>(6U, 1024U, "l1_dtlb2mb_size.txt", MAP_HUGETLB);
+        measureL1dtlb<1024U*1024U*2U>(6U, "l1_dtlb2mb_size.txt", MAP_HUGETLB);
         break;
     case RunITLB:
         generateInstructionTLBSizeData<4096U>(6U, 256U*1024U, "itlb_size_data.txt", 0);
