@@ -1,18 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
-#include <time.h>
-#include <emmintrin.h>
-#include <sys/mman.h>
-#include <errno.h>
 #include <string.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <vector>
 #include <algorithm>
 #include <random>
 #include <array>
+
+#include <sys/mman.h>
 
 typedef uint8_t u8;
 typedef uint32_t u32;
