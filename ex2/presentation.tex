@@ -463,12 +463,13 @@ $\rightarrow$ page granularity
 \frametitle{Page sizes}
 \begin{itemize}
 \item TLB-misses are all about latency
-\item But some memory systems are designed for throughput\\
+\item But some memory systems are all about throughput\\
 Think your x86 CPU. Or even better, your GPU :)
 \item To reduce TLB misses, just have bigger pages\\
 On x86: 4KB, 2MB, 1GB
 \item 4KB page: 0xAABBCCDD = AABBC (tag) . CDD (page offset)\\
 Important: CDD is also the concatenation of cache set index and line offset on current Intel processors\\
+\item It's more complicated
 \end{itemize}
 \end{frame}
 
@@ -489,13 +490,13 @@ As we increase the working set, we will start thrashing the L1/L2 TLBs
 \end{frame}
 
 \begin{frame}
-\frametitle{D-TLB - 4 KB page - Sandy Bridge}
-\includegraphics[scale=.18]{img/dtlb_size.png}
+\frametitle{D-TLB - Sandy Bridge}
+\includegraphics[scale=.26]{img/dtlb_size_sandybridge.png}
 \end{frame}
 
 \begin{frame}
-\frametitle{D-TLB - 2 MB page - Haswell}
-\includegraphics[scale=.24]{img/dtlb_2mb_size.png}
+\frametitle{D-TLB - Haswell}
+\includegraphics[scale=.26]{img/dtlb_size_haswell.png}
 \end{frame}
 
 \begin{frame}
@@ -504,18 +505,31 @@ As we increase the working set, we will start thrashing the L1/L2 TLBs
 \end{frame}
 
 \begin{frame}
-\frametitle{I-TLB - 4 KB page - Sandy Bridge}
-\includegraphics[scale=.18]{img/itlb_size.png}
+\frametitle{I-TLB - Sandy Bridge}
+\includegraphics[scale=.26]{img/itlb_size_sandybridge.png}
 \end{frame}
 
 \begin{frame}
-\frametitle{I-TLB - 2 MB page - Haswell}
-\includegraphics[scale=.24]{img/itlb_2mb_size.png}
+\frametitle{I-TLB - Haswell}
+\includegraphics[scale=.26]{img/itlb_size_haswell.png}
 \end{frame}
 
 \begin{frame}
 \frametitle{I-TLB - 4 KB page - Ryzen 2700X}
 \includegraphics[scale=.18]{img/itlb_size_zen.png}
+\end{frame}
+
+\section{Summary}
+
+\begin{frame}
+\frametitle{Final points}
+\begin{itemize}
+\item Performance is not only about the I/D caches
+\item Accessing memory is complex
+\item That complexity is to stay
+\item Kernel's management of memory is even more complex
+\end{itemize}
+
 \end{frame}
 
 \begin{frame}
