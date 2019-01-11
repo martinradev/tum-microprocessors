@@ -7,7 +7,32 @@
 #include <random>
 #include <array>
 
+#ifdef __linux__ 
 #include <sys/mman.h>
+#else
+#include <windows.h>
+#define MAP_FAILED (NULL)
+#endif
+
+
+void *mapMemory(size_t size, bool isExecutable, bool useBigPages)
+{
+#ifdef __linux__
+	return mmap(NULL, size, PROT_READ|PROT_WRITE|(isExecutable ? PROT_EXEC : 0), MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS|(useBigPages?MAP_HUGETLB:0), -1, 0U);
+#else
+	void *ptr = VirtualAlloc(NULL, size, MEM_COMMIT|MEM_RESERVE|(useBigPages?MEM_LARGE_PAGES:0), (isExecutable?PAGE_EXECUTE_READWRITE:PAGE_READWRITE));
+	return ptr;
+#endif
+}
+
+void unmapMemory(void *ptr, size_t size)
+{
+#ifdef __linux__
+	munmap(ptr, size);
+#else 
+	VirtualFree(ptr, size, MEM_RELEASE);
+#endif
+}
 
 typedef uint8_t u8;
 typedef uint32_t u32;
@@ -148,7 +173,7 @@ static void generateInstructionCacheSizeData(void)
 {
     const size_t kMaxBlocks = 256*1024;
     FILE *inp = fopen("icache_size_data.txt", "w+");
-    Block *blocks = (Block*)mmap(NULL, sizeof(Block) * kMaxBlocks, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
+    Block *blocks = (Block*)mapMemory(sizeof(Block) * kMaxBlocks, true, false);
     if (blocks == (Block*)-1)
     {
         printf("Failed to alloc memory");
@@ -206,7 +231,7 @@ static void generateInstructionCacheSizeData(void)
         printf("Done: %lu/%lu\n", j, kMaxBlocks);
     }
     fclose(inp);    
-    munmap(blocks, sizeof(Block) * kMaxBlocks);
+    unmapMemory(blocks, sizeof(Block) * kMaxBlocks);
 }
 
 static void generateCacheSizeData(void)
@@ -216,7 +241,7 @@ static void generateCacheSizeData(void)
     // Ideally we should be using big pages (HUGEPAGE_TLB) but that doesn't seem to be supported on my linux.
     // The L1-TLB can hold only info for 160 kb of data!
     const size_t kMaxBlocks = 12*1024U*1024U;
-    Block *blocks = (Block*)mmap(NULL, sizeof(Block) * kMaxBlocks, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
+    Block *blocks = (Block*)mapMemory(sizeof(Block) * kMaxBlocks, false, false);
     if (blocks == MAP_FAILED)
     {
         printf("Failed to allocate: %s\n", strerror(errno));
@@ -286,7 +311,7 @@ size_t log2int(size_t pow2number)
 void generateL1CacheAssociativityData(size_t cacheLineSize, size_t l1Size)
 {
     size_t numCacheLinesToAlloc = 1024U * 1024U * 8U;
-    Block *blocks = (Block*)mmap(NULL, sizeof(Block) * numCacheLinesToAlloc, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
+    Block *blocks = (Block*)mapMemory(sizeof(Block) * numCacheLinesToAlloc, false, false);
     FILE *out = fopen("l1_assoc_data.txt", "w+");
     if (blocks == (Block*)-1)
     {
@@ -354,85 +379,6 @@ void generateL1CacheAssociativityData(size_t cacheLineSize, size_t l1Size)
     fclose(out);
 }
 
-void generateL2CacheAssociativityData(size_t cacheLineSize, size_t l2Size, size_t l1Size, size_t l1Assoc)
-{
-    size_t numCacheLinesToAlloc = 1024U * 1024U * 8U;
-    Block *blocks = (Block*)mmap(NULL, sizeof(Block) * numCacheLinesToAlloc, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS, -1, 0U);
-    if (blocks == (Block*)-1)
-    {
-        printf("Failed to alloc memory\n");
-        return;
-    }
-    uintptr_t va = (uintptr_t)blocks;    
-    printf("Allocation virtual address is %llx\n", (unsigned long long)va);
-    size_t numLinesInCache = l2Size / cacheLineSize;
-    const size_t l1Bits = log2int((l1Size / (l1Assoc * cacheLineSize)));
-    for (size_t i = 2; i <= 32; i*=2)
-    {
-        size_t indexPow2 = numLinesInCache / (1U << log2int(i));        
-        size_t setIndex = (va >> log2int(cacheLineSize)) & (indexPow2-1U);
-        printf("%lu-way, %lu bits for index, index is %lu\n", i, log2int(indexPow2), setIndex);
-        const size_t numIterations = 256U * 1024U * 1024U;
-        u64 sample1 = 0U;
-        {
-            printf("First try\n");
-            // Generate sequence.
-            Block *cBlock = blocks;
-            printf("Access: %llx\n", (unsigned long long)cBlock);
-            for (size_t j = 0U; j < i-1; ++j)
-            {
-                cBlock->next = cBlock + indexPow2;
-                cBlock = cBlock->next;
-                printf("Access: %llx\n", (unsigned long long)cBlock);
-            }
-            cBlock->next = blocks;
-            cBlock = blocks;
-            u64 t1 = __rdtscp_start();
-            for (size_t j = 0U; j < numIterations; ++j)
-            {
-                cBlock = cBlock->next;
-            }
-            u64 t2 = __rdtscp_end();
-            sample1 = t2-t1;
-            if (cBlock == NULL)
-            {
-                // Just a dependency.
-                exit(1);
-            }
-        }
-        u64 sample2 = 0U;
-        {
-            printf("Second try\n");
-            // Generate sequence.
-            Block *cBlock = blocks;
-            printf("Access: %llx\n", (unsigned long long)cBlock);
-            for (size_t j = 0U; j < i*2-1; ++j)
-            {
-                cBlock->next = cBlock + indexPow2;
-                cBlock = cBlock->next;
-                printf("Access: %llx\n", (unsigned long long)cBlock);
-            }
-            cBlock->next = blocks;
-            cBlock = blocks;
-            u64 t1 = __rdtscp_start();
-            for (size_t j = 0U; j < numIterations; ++j)
-            {
-                cBlock = cBlock->next;
-            }
-            u64 t2 = __rdtscp_end();
-            sample2 = t2-t1;
-            if (cBlock == NULL)
-            {
-                // Just a dependency.
-                exit(1);
-            }
-        }
-
-        printf("%lf %lu %lu\n", (double)sample2 / sample1, sample1, sample2);
-        
-    }
-}
-
 template<size_t T>
 struct SizedBlock
 {
@@ -474,7 +420,7 @@ void measureL1dtlb(size_t setIndexBits, const char *fileName, int tlbFlags)
 {
     using PageBlock = SizedBlock<PageSize>;
     size_t numBlocksToAlloc = 2048;
-    PageBlock *blocks = (PageBlock*)mmap(NULL, sizeof(PageBlock) * numBlocksToAlloc, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS|tlbFlags, -1, 0U);
+    PageBlock *blocks = (PageBlock*)mapMemory(sizeof(PageBlock) * numBlocksToAlloc, false, tlbFlags);
     if (blocks == (PageBlock*)-1)
     {
         printf("Failed to alloc memory\n");
@@ -511,7 +457,7 @@ static void generateInstructionTLBSizeData(size_t setIndexBits, const size_t kMa
 {
     using PageBlock = SizedBlock<PageSize>;
     FILE *inp = fopen(fileName, "w+");
-    PageBlock *blocks = (PageBlock*)mmap(NULL, sizeof(PageBlock) * kMaxBlocks, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_PRIVATE|MAP_POPULATE|MAP_ANONYMOUS|tlbFlags, -1, 0U);
+    PageBlock *blocks = (PageBlock*)mapMemory(sizeof(PageBlock) * kMaxBlocks, true, tlbFlags);
     if (blocks == (PageBlock*)-1)
     {
         printf("Failed to alloc memory");
@@ -601,7 +547,7 @@ static void generateInstructionTLBSizeData(size_t setIndexBits, const size_t kMa
         fprintf(inp, "%llu %llu\n", (unsigned long long)j, (unsigned long long)(t2-t1)/kMaxAccesses);
     }
     fclose(inp);    
-    munmap(blocks, sizeof(Block) * kMaxBlocks);
+    unmapMemory(blocks, sizeof(Block) * kMaxBlocks);
 }
 
 typedef enum RunTypeDecl
@@ -693,7 +639,6 @@ int main(int argc, char *argv[])
         generateL1CacheAssociativityData(64U /* line size */, 32U * 1024U /*l1 cache size*/);
         break;
     case RunCpuL2Assoc:
-        generateL2CacheAssociativityData(64U /* line size */, 256U * 1024U /* l2 cache size */, 32*1024U /* l1 cache size */, 8U /* l1 associativy */);
         break;
     case RunCpuL3Assoc:
         //generateCacheAssociativityData(64U, 12U * 1024U * 1024U);
@@ -706,13 +651,13 @@ int main(int argc, char *argv[])
         measureL1dtlb<4096U>(6U, "l1_dtlb_size.txt", 0);
         break;
     case RunDTLB2MB:
-        measureL1dtlb<1024U*1024U*2U>(6U, "l1_dtlb2mb_size.txt", MAP_HUGETLB);
+        measureL1dtlb<1024U*1024U*2U>(6U, "l1_dtlb2mb_size.txt", true);
         break;
     case RunITLB:
         generateInstructionTLBSizeData<4096U>(6U, 256U*1024U, "itlb_size_data.txt", 0);
         break;
     case RunITLB2MB:
-        generateInstructionTLBSizeData<2U*1024U*1024U>(6U, 1024U, "itlb2mb_size_data.txt", MAP_HUGETLB);
+        generateInstructionTLBSizeData<2U*1024U*1024U>(6U, 1024U, "itlb2mb_size_data.txt", true);
         break;
     default:
         break;
