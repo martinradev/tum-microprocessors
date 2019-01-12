@@ -62,11 +62,11 @@ with open("icache_size_data.txt", "r") as f:
     fig, ax1 = pl.subplots()
     ax1.plot(xV, yV)
     ax1.set_xscale('log')
-    t = [128, 32*1024, 256*1024]
-    tl = ['128B', '32KB', '256KB']
+    t = [ 32*1024, 256*1024]
+    tl = [ '32KB', '256KB']
     ax1.set_xticklabels(tl)
     ax1.set_xticks(t)
-    ax1.set(xlabel="Work set size", ylabel="cycles", title="Instruction cache size")
+    ax1.set(xlabel="Work set size", ylabel="cycles/access", title="Instruction cache size")
     pl.show()
 
 

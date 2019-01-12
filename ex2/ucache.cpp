@@ -227,7 +227,7 @@ static void generateInstructionCacheSizeData(void)
                      : "r"(kMaxAccesses), "r"((u64)blocks) 
                      : "eax", "flags");
         u64 t2 = __rdtscp_end();
-        fprintf(inp, "%llu %llu\n", (unsigned long long)j*sizeof(Block), (unsigned long long)(t2-t1));
+        fprintf(inp, "%llu %llu\n", (unsigned long long)j*sizeof(Block), (unsigned long long)(t2-t1)/kMaxAccesses);
         printf("Done: %lu/%lu\n", j, kMaxBlocks);
     }
     fclose(inp);    
