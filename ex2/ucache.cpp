@@ -234,21 +234,21 @@ static void generateInstructionCacheSizeData(void)
     unmapMemory(blocks, sizeof(Block) * kMaxBlocks);
 }
 
-static void generateCacheSizeData(void)
+static void generateCacheSizeData(const char *fileName, bool useBigPages)
 {
     // This should be 500kb.
     // Here we use mmap to hopefully guarantee that the pages are locked(pinned).
     // Ideally we should be using big pages (HUGEPAGE_TLB) but that doesn't seem to be supported on my linux.
     // The L1-TLB can hold only info for 160 kb of data!
     const size_t kMaxBlocks = 12*1024U*1024U;
-    Block *blocks = (Block*)mapMemory(sizeof(Block) * kMaxBlocks, false, false);
+    Block *blocks = (Block*)mapMemory(sizeof(Block) * kMaxBlocks, false, useBigPages);
     if (blocks == MAP_FAILED)
     {
         printf("Failed to allocate: %s\n", strerror(errno));
         return;
     }
 
-    FILE *inp = fopen("cache_size_data.txt", "w+");
+    FILE *inp = fopen(fileName, "w+");
     for (size_t j = 3U; j < kMaxBlocks; j = (j*15U)/11U)
     {
         generateRandomSequence(blocks, j);
@@ -269,7 +269,7 @@ static void generateCacheSizeData(void)
             u64 delta = t2-t1;
             avg += delta;
         }
-        avg /= numSamples;
+        avg /= (numSamples*kMaxAccesses);
         // No need to divide by the number of accesses because the number of accesses are always the same!
         fprintf(inp, "%llu %llu\n", (unsigned long long)j*sizeof(Block), (unsigned long long)avg);
         printf("Done: %llu/%llu\n", (unsigned long long)j, (unsigned long long)kMaxBlocks);
@@ -427,7 +427,7 @@ void measureL1dtlb(size_t setIndexBits, const char *fileName, int tlbFlags)
         return;
     }
     FILE *out = fopen(fileName, "w+");
-    for (size_t sz = 2U; sz < 2*1024U; ++sz)
+    for (size_t sz = 516U; sz < 517U; ++sz)
     {
         generateSizedRandomSequence<PageSize>(blocks, sz, setIndexBits);
         const u64 numIterations = 8U * 1024U * 1024U;
@@ -555,6 +555,7 @@ typedef enum RunTypeDecl
     RunAll,
     RunCacheLine,
     RunCacheSize,  
+    RunCacheSize2mb,
     RunICacheSize,
     RunCpuidInfo,
     RunCpuL1Assoc,
@@ -582,6 +583,10 @@ int main(int argc, char *argv[])
         else if (strcmp("-size", argv[i]) == 0)
         {
             rt = RunCacheSize;
+        }
+        else if (strcmp("-size2mb", argv[i]) == 0)
+        {
+            rt = RunCacheSize2mb;
         }
         else if (strcmp("-isize", argv[i]) == 0)
         {
@@ -630,7 +635,10 @@ int main(int argc, char *argv[])
         generateCacheLineData();
         break;
     case RunCacheSize:
-        generateCacheSizeData();
+        generateCacheSizeData("cache_size_data.txt", false);
+        break;
+    case RunCacheSize2mb:
+        generateCacheSizeData("cache_size_data_2mb.txt", true);
         break;
     case RunCpuidInfo:
         printInfoFromCpuid();

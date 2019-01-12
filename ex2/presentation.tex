@@ -206,13 +206,20 @@ typedef struct BlockDecl
 
 void generateRandomSequence(Block *blocks, size_t numBlocks)
 {
-    size_t prevAddr = 0U;
+    std::vector<size_t> seq(numBlocks-1);
+    for (size_t i = 1; i < numBlocks; ++i)
+    {   
+        seq[i-1] = i;
+    }   
+    std::shuffle(seq.begin(), seq.end(), std::default_random_engine(111U));
+    seq.push_back(0);
+    size_t prevAddr = 0U; 
     for (size_t i = 0U; i < numBlocks; ++i)
-    {
-        size_t nextAddr = (prevAddr + numBlocks - 1U) % numBlocks;
+    {   
+        size_t nextAddr = seq[i];
         blocks[prevAddr].next = &blocks[nextAddr];
         prevAddr = nextAddr;
-    }
+    }   
 }
 \end{lstlisting}
 \end{block}
@@ -234,7 +241,6 @@ for (size_t j = 3U; j < kMaxBlocks; j = (j*15U)/11U)
 {
     generateRandomSequence(blocks, j);
     size_t kMaxAccesses = kMaxBlocks; // Make sure all blocks are accessed
-    size_t numSamples = 4U; 
     u64 t1 = time_start()
     Block *b = &blocks[0]; 
     for (size_t i = 0U; i < kMaxAccesses; ++i)
@@ -251,7 +257,7 @@ for (size_t j = 3U; j < kMaxBlocks; j = (j*15U)/11U)
 
 \begin{frame}
 \frametitle{Data cache plot - I7 3930K (Sandy bridge)}
-\includegraphics[scale=.18]{img/data_size.png}
+\includegraphics[scale=.18]{img/data_cache_size_page.png}
 \end{frame}
 
 \begin{frame}
@@ -403,46 +409,6 @@ for (size_t j = 64U; j < kMaxBlocks; j += 64) {
 \begin{frame}
 \frametitle{I-cache plot (Sandy Bridge)}
 \includegraphics[scale=.18]{img/instr_size.png}
-\end{frame}
-
-\begin{frame}
-\frametitle{Measuring L1 D-cache associativity}
-\begin{itemize}
-\item Use P-chasing again
-\item Design work set for conflict misses, not capacity misses
-\end{itemize}
-
-\begin{block}{64B line, 32 KB L1 D-cache}
-32 KB = $2^{15}$ b\\
-Let's assume 8-way associativity\\
-Sets = $2^{15}$ / ($2^{3}$ * $2^6$) = $2^6$\\
-We have: 6 bits line offset, 6 bits set index, 20 bits tag\\
-Thus, 0xAABB\textbf{C}CDD and 0xAABB\textbf{D}CDD go to the same set!
-\end{block}
-\end{frame}
-
-\section{L1 associativity}
-
-\begin{frame}
-\frametitle{Measuring L1 D-cache associativity - observations}
-\begin{itemize}
-\item Underestimating the assoc still generates addresses to the same set index\\
-But since the work set is small, we will have no conflicts
-\item Overestimating the assoc generates addresses to different sets\\
-Although we have a bigger working set, we will have no conflicts
-\item Thus, it's better to measure the change in cost for a bigger working set under same \#Ways\\
-\end{itemize}
-\begin{block}{example}
-C1 = cost(many accesses 16 lines) / cost(many accesses 8 lines) for a 8-way cache\\
-C2 = cost(many accesses 8 lines) / cost(many accesses 4lines) for a 8-way cache\\
-C2 will be smaller than C1
-\end{block}
-The code is messy
-\end{frame}
-
-\begin{frame}
-\frametitle{L1 D-cache associativity plot}
-\includegraphics[scale=.25]{img/l1_d_assoc.png}
 \end{frame}
 
 \section{TLB hierarchy}
