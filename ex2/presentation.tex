@@ -93,7 +93,7 @@
 \institute[Microprocessors18] % Your institution as it will appear on the bottom of every slide, may be shorthand to save space
 {
 \medskip
-\textit{} % Your email address
+\textit{Not an expert} % Your email address
 }
 \date{\today} % Date, can be changed to a custom date
 
@@ -164,7 +164,7 @@ for (u32 stride = 1; stride < 128; ++stride)
 
 \begin{frame}
 \frametitle{Cache line plot}
-\includegraphics[scale=.24]{img/cache_line_size.png}
+\centerline{\includegraphics[scale=.3]{img/cache_line_size.png}}
 \end{frame}
 
 \begin{frame}
@@ -189,9 +189,7 @@ for (u32 stride = 1; stride < 128; ++stride)
 \item Access randomly and uniformly to avoid prefetching
 \item Typically done via \textbf{pointer chasing}
 \end{itemize}
-\begin{center}
-\includegraphics[scale=.3]{img/pchase.jpg}
-\end{center}
+\centerline{\includegraphics[scale=.3]{img/pchase.jpg}}
 \end{frame}
 
 \begin{frame}[fragile]
@@ -257,12 +255,33 @@ for (size_t j = 3U; j < kMaxBlocks; j = (j*15U)/11U)
 
 \begin{frame}
 \frametitle{Data cache plot - I7 3930K (Sandy bridge)}
-\includegraphics[scale=.18]{img/data_cache_size_page.png}
+\centerline{\includegraphics[scale=.23]{img/data_cache_size_page.png}}
+\end{frame}
+
+\begin{frame}
+\frametitle{Data cache plot - I7 4900MQ (Haswell)}
+\centerline{\includegraphics[scale=.3]{img/data_cache_size_page_haswell.png}}
 \end{frame}
 
 \begin{frame}
 \frametitle{Data cache plot - Ryzen 2700X}
-\includegraphics[scale=.18]{img/data_size_zen.png}
+\centerline{\includegraphics[scale=.23]{img/data_size_zen.png}}
+\end{frame}
+
+\begin{frame}
+\frametitle{Some observations}
+\begin{itemize}
+\item Using 2MB pages improves perf as buffer size increases\\
+\item Increase in cost/read as L2/L3 capacity is reached\\
+Possibly many reasons:\\
+\begin{itemize}
+\item Increase in TLB capacity misses for 4KB pages
+\item L2 is shared among I-L1,D-L1
+\item L3 is shared among cores
+\item Poor page coloring?\\
+This can be an issue for L2/L3 where the cache is very big!
+\end{itemize}
+\end{itemize}
 \end{frame}
 
 \section{Instruction cache}
@@ -408,7 +427,12 @@ for (size_t j = 64U; j < kMaxBlocks; j += 64) {
 
 \begin{frame}
 \frametitle{I-cache plot (Sandy Bridge)}
-\includegraphics[scale=.18]{img/instr_size.png}
+\centerline{\includegraphics[scale=.3]{img/instr_size_sandy_bridge.png}}
+\end{frame}
+
+\begin{frame}
+\frametitle{I-cache plot (Haswell)}
+\centerline{\includegraphics[scale=.3]{img/instr_size_haswell.png}}
 \end{frame}
 
 \section{TLB hierarchy}
@@ -417,24 +441,25 @@ for (size_t j = 64U; j < kMaxBlocks; j += 64) {
 \frametitle{Performance is not only about the I/D-cache}
 \begin{itemize}
 \item Modern systems have to translate virtual addresses to physical
-\item Privilege level has to be checked
+\item Protection, privilege level have to be checked
 \item Requires caching again, but at a different granularity\\
 $\rightarrow$ page granularity
 \item TLB - translation lookaside buffer
-\item Typically L1 I-TLB, L1 D-TLB, L2 I-TLB, L2 D-TLB
+\item Typically L1 I-TLB, L1 D-TLB, L2 S(hared)TLB 
 \end{itemize}
 \end{frame}
 
 \begin{frame}
 \frametitle{Page sizes}
 \begin{itemize}
-\item TLB-misses are all about latency
+\item We want to resolve TLB-misses ASAP
 \item But some memory systems are all about throughput\\
 Think your x86 CPU. Or even better, your GPU :)
 \item To reduce TLB misses, just have bigger pages\\
-On x86: 4KB, 2MB, 1GB
+On x86: \textbf{4KB, 2MB, 1GB}
 \item 4KB page: 0xAABBCCDD = AABBC (tag) . CDD (page offset)\\
-Important: CDD is also the concatenation of cache set index and line offset on current Intel processors\\
+Important: CDD is also the concatenation of cache set index and line offset for the L1 cache\\
+Not true for L2 :)
 \item It's more complicated
 \end{itemize}
 \end{frame}
@@ -457,32 +482,32 @@ As we increase the working set, we will start thrashing the L1/L2 TLBs
 
 \begin{frame}
 \frametitle{D-TLB - Sandy Bridge}
-\includegraphics[scale=.26]{img/dtlb_size_sandybridge.png}
+\centerline{\includegraphics[scale=.23]{img/dtlb_size_sandybridge.png}}
 \end{frame}
 
 \begin{frame}
 \frametitle{D-TLB - Haswell}
-\includegraphics[scale=.26]{img/dtlb_size_haswell.png}
+\centerline{\includegraphics[scale=.23]{img/dtlb_size_haswell.png}}
 \end{frame}
 
 \begin{frame}
 \frametitle{D-TLB - 4 KB page - Ryzen 2700X}
-\includegraphics[scale=.18]{img/dtlb_size_zen.png}
+\centerline{\includegraphics[scale=.23]{img/dtlb_size_zen.png}}
 \end{frame}
 
 \begin{frame}
 \frametitle{I-TLB - Sandy Bridge}
-\includegraphics[scale=.26]{img/itlb_size_sandybridge.png}
+\centerline{\includegraphics[scale=.3]{img/itlb_size_sandybridge.png}}
 \end{frame}
 
 \begin{frame}
 \frametitle{I-TLB - Haswell}
-\includegraphics[scale=.26]{img/itlb_size_haswell.png}
+\centerline{\includegraphics[scale=.3]{img/itlb_size_haswell.png}}
 \end{frame}
 
 \begin{frame}
 \frametitle{I-TLB - 4 KB page - Ryzen 2700X}
-\includegraphics[scale=.18]{img/itlb_size_zen.png}
+\centerline{\includegraphics[scale=.23]{img/itlb_size_zen.png}}
 \end{frame}
 
 \section{Summary}
@@ -494,6 +519,7 @@ As we increase the working set, we will start thrashing the L1/L2 TLBs
 \item Accessing memory is complex
 \item That complexity is to stay
 \item Kernel's management of memory is even more complex
+\item Many other things to measure for size - associativity, page-walk caches, ...
 \end{itemize}
 
 \end{frame}
