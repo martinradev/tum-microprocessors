@@ -45,14 +45,15 @@ struct ThreadData
 {
 	size_t elemsPerThread;
 	char* start;
-}
+};
 
 static void* toUpperPthread(void* threadArg)
 {
 	// Convert argument to data type
-	struct threadData *data = (struct threadData *) threadArg;
-	
+	struct ThreadData *data = (struct ThreadData *) threadArg;
+
 	// Get end point of the partition
+	char* start = data->start;
 	char* end = &(data->start[data->elemsPerThread]);
 
 	// Perform to upper on thread's partition
@@ -64,7 +65,7 @@ static void* toUpperPthread(void* threadArg)
 		*start = c;
 		++start;
     }
-    
+
     // Close the thread
     pthread_exit(NULL);
 }
@@ -75,10 +76,10 @@ static void toupper_optimised(char * text, size_t n)
 	{
 		return;
 	}
-	
+
 	// Set up for multi-threads
 	pthread_t threads[64];
-	struct ThreadData* threadDataArray[64];
+	struct ThreadData threadDataArray[64];
 	char * head = &text[0];
 
 	size_t elemsPerThread = n / NumThreads;
@@ -87,27 +88,39 @@ static void toupper_optimised(char * text, size_t n)
 	for (i = 0; i < NumThreads; ++i)
 	{
 		threadDataArray[i].start = head + i * elemsPerThread;
-		threadDataArray[i].elemsPerThread = elemsPerThread; 
+		threadDataArray[i].elemsPerThread = elemsPerThread;
 	}
 
 	// Do the multi-thread
 	int rc;	long t;
 	for (t = 0; t < NumThreads; t++)
 	{
-		rc = pthread_create(&threads[t], NULL, 
+		rc = pthread_create(&threads[t], NULL,
 				toUpperPthread, (void *) &threadDataArray[t]);
 	}
 
+	// Sync threads
+	void* status;
+	for (t = 0; t < NumThreads; ++t)
+	{
+		rc = pthread_join(threads[t], &status);
+
+   		if (rc)
+   		{
+        	printf("ERROR; return code from pthread_join() is %d\n", rc);
+          	exit(-1);
+        }
+	}
 
 	// Handle the suffix
 	size_t suffixStart = elemsPerThread * n;
 	size_t suffixLen = n % NumThreads;
-	
+
 	for ( i = 0; i < suffixLen; i++ )
 	{
 		char c = text[suffixStart + i];
 		int cond = (c >= 'a' && c <= 'z');
-		c = c - cond*0x20U;
+		c = c - cond * 0x20U;
 		text[suffixStart + i] = c;
 	}
 }
