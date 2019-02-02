@@ -80,14 +80,13 @@ static void toupper_optimised(char * text, size_t n)
 	// Set up for multi-threads
 	pthread_t threads[64];
 	struct ThreadData threadDataArray[64];
-	char * head = &text[0];
 
 	size_t elemsPerThread = n / NumThreads;
 
 	size_t i = 0;
 	for (i = 0; i < NumThreads; ++i)
 	{
-		threadDataArray[i].start = head + i * elemsPerThread;
+		threadDataArray[i].start = text + i * elemsPerThread;
 		threadDataArray[i].elemsPerThread = elemsPerThread;
 	}
 
@@ -113,7 +112,7 @@ static void toupper_optimised(char * text, size_t n)
 	}
 
 	// Handle the suffix
-	size_t suffixStart = elemsPerThread * n;
+	size_t suffixStart = elemsPerThread * NumThreads;
 	size_t suffixLen = n % NumThreads;
 
 	for ( i = 0; i < suffixLen; i++ )
@@ -154,7 +153,7 @@ char createChar(int ratio){
 
 char * init(unsigned long int sz, int ratio, char **original){
     int i=0;
-    char *text = (char *) mymalloc(sz+1, original);
+    char *text = (char *) mymalloc(sz+1, (void **) original);
     srand(1);// ensures that all strings are identical
     for(i=0;i<sz;i++){
 			char c = createChar(ratio);
