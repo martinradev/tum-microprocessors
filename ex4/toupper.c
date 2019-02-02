@@ -1,3 +1,5 @@
+#include <pthread.h>
+#include <arm_neon.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,11 +8,10 @@
 #include <stdint.h>
 #include <assert.h>
 #include <time.h>
-#include <pthread.h>
 
 int debug = 0;
-double *results;
-double *ratios;
+float *results;
+float *ratios;
 unsigned long   *sizes;
 
 int no_sz = 1, no_ratio =1, no_version=1;
@@ -18,11 +19,11 @@ unsigned NumThreads=1;
 
 // This is not really the way to be done.
 // Rather, one should use the arch-specific high performance counters!
-static inline double gettime(void) {
+static inline float gettime(void) {
     struct timespec ts = {0};
     int err = clock_gettime(CLOCK_MONOTONIC, &ts);
     (void)err;
-    return (double)ts.tv_sec + (double)ts.tv_nsec / 1000000000.0;
+    return (float)ts.tv_sec + (float)ts.tv_nsec / 1000000000.0f;
 }
 
 
@@ -49,25 +50,42 @@ struct ThreadData
 
 static void* toUpperPthread(void* threadArg)
 {
+	int counter = 0;
+	printf("%d\n", ++counter);
+
 	// Convert argument to data type
 	struct ThreadData *data = (struct ThreadData *) threadArg;
 
 	// Get end point of the partition
-	char* start = data->start;
-	char* end = &(data->start[data->elemsPerThread]);
+	int8x8_t* start = data->start;
+
+	printf("%d\n", ++counter);
 
 	// Perform to upper on thread's partition
-	while(start != end)
+	uint8x8_t as;
+	uint8_t temp = 97;
+	as = vmov_n_u8 (temp);
+	uint8x8_t zs = vmov_n_u8 ((uint8_t)'z');
+	uint8x8_t dif = vmov_n_u8 ((uint8_t)0x20);
+
+	printf("%d\n", ++counter);
+
+	size_t i = 0;
+	size_t sz = data->elemsPerThread / 16;
+	while(i < sz)
 	{
-		char c = *start;
-		int cond = (c >= 'a' && c <= 'z');
-		c = c - cond*0x20U;
-		*start = c;
-		++start;
+		uint8x8_t c = *(uint8x8_t*)(start + i);
+		uint8x8_t biggerCond = vcge_u8(c, as);
+		uint8x8_t lessCond = vcle_u8(c, as);
+		uint8x8_t cond = vand_u8(biggerCond, lessCond);
+		c = vmls_u8(c, cond, dif);
+		*(uint8x8_t*)(start+i) = c;
+		++i;
     }
 
-    // Close the thread
-    pthread_exit(NULL);
+    printf("%d\n", ++counter);
+
+    return NULL;
 }
 
 static void toupper_optimised(char * text, size_t n)
@@ -77,11 +95,15 @@ static void toupper_optimised(char * text, size_t n)
 		return;
 	}
 
+	int counter = 0;
+
 	// Set up for multi-threads
 	pthread_t threads[64];
 	struct ThreadData threadDataArray[64];
 
 	size_t elemsPerThread = n / NumThreads;
+
+	printf("%d\n", ++counter);
 
 	size_t i = 0;
 	for (i = 0; i < NumThreads; ++i)
@@ -90,6 +112,8 @@ static void toupper_optimised(char * text, size_t n)
 		threadDataArray[i].elemsPerThread = elemsPerThread;
 	}
 
+	printf("%d\n", ++counter);
+
 	// Do the multi-thread
 	int rc;	long t;
 	for (t = 0; t < NumThreads; t++)
@@ -97,6 +121,10 @@ static void toupper_optimised(char * text, size_t n)
 		rc = pthread_create(&threads[t], NULL,
 				toUpperPthread, (void *) &threadDataArray[t]);
 	}
+
+	// toUpperPthread((void*)threadDataArray);
+
+	printf("%d\n", ++counter);
 
 	// Sync threads
 	void* status;
@@ -173,7 +201,7 @@ typedef void (*toupperfunc)(char *text, size_t n);
 
 void run_toupper(int size, int ratio, int version, toupperfunc f, const char* name)
 {
-   double start, stop;
+   float start, stop;
 		int index;
 
 		index =  ratio;
@@ -183,7 +211,6 @@ void run_toupper(int size, int ratio, int version, toupperfunc f, const char* na
     char *textOriginalPtr;
     char *text = init(sizes[size], ratios[ratio], &textOriginalPtr);
 
-
     if(debug) printf("Before: %.40s...\n",text);
 
     start = gettime();
@@ -191,8 +218,8 @@ void run_toupper(int size, int ratio, int version, toupperfunc f, const char* na
     stop = gettime();
     results[index] = stop-start;
 
+    if(debug) printf("After:  %.40s...\n", text);
     free(textOriginalPtr);
-    if(debug) printf("After:  %.40s...\n",text);
 }
 
 struct _toupperversion {
@@ -266,19 +293,25 @@ int main(int argc, char* argv[])
 		}
     for(v=0; toupperversion[v].func !=0; v++)
 		no_version=v+1;
+
 		if(0==max_sz)  no_sz =1;
 		else no_sz = (max_sz-min_sz)/step_sz+1;
+
 		if(0==max_ratio)  no_ratio =1;
 		else no_ratio = (max_ratio-min_ratio)/step_ratio+1;
+
 		no_exp = v*no_sz*no_ratio;
-		results = (double *)malloc(sizeof(double[no_exp]));
-		ratios = (double *)malloc(sizeof(double[no_ratio]));
+		results = (float *)malloc(sizeof(float[no_exp]));
+		ratios = (float *)malloc(sizeof(float[no_ratio]));
 		sizes = (long *)malloc(sizeof(long[no_sz]));
 
 		for(i=0;i<no_sz;i++)
 			sizes[i] = min_sz + i*step_sz;
+
 		for(i=0;i<no_ratio;i++)
-			ratios[i] = min_ratio + i*step_ratio;
+		{
+			ratios[i] = min_ratio + i * step_ratio;
+		}
 
 		for(i=0;i<no_sz;i++)
 			for(j=0;j<no_ratio;j++)
