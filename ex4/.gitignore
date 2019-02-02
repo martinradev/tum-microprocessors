@@ -1,0 +1,14 @@
+*.s
+results*
+*.txt
+toupper_variant*
+.autoclean
+*.swp
+*.pdf
+*.aux
+*.fls
+*.gz
+*.fdb_latexmk
+*.out
+*.log
+plots
